@@ -116,7 +116,8 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
 
         try!(self.persistence.delete(&pubkey));
 
-        try!(ZMsg::send_multi(&self.publisher, &[
+        let msg = ZMsg::new();
+        try!(msg.send_multi(&self.publisher, &[
             cert.cert_type().to_str(),
             "DEL",
             &pubkey,
@@ -173,7 +174,8 @@ mod tests {
         let client = ZSock::new_req("inproc://api_test_create").unwrap();
         let server = ZSock::new_rep("inproc://api_test_create").unwrap();
 
-        ZMsg::send_multi(&client, &["host", "usetheforks.com"]).unwrap();
+        let msg = ZMsg::new();
+        msg.send_multi(&client, &["host", "usetheforks.com"]).unwrap();
         assert!(api.do_create(&server).is_ok());
 
         let reply = ZMsg::recv(&client).unwrap();
