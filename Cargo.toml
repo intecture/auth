@@ -16,7 +16,7 @@ tempdir = "0.3.*"
 
 czmq = { git = "https://github.com/petehayes102/rust-czmq.git", branch = "dev" }
 rustc-serialize = "0.3.*"
-zdaemon = { path = "../zdaemon" }
+zdaemon = { git = "https://github.com/betweenlines/zdaemon.git" }
 zmq = { git = "https://github.com/petehayes102/rust-zmq.git", branch = "tmp-master" }
 
 [lib]
