@@ -19,7 +19,6 @@ mod cert_cache;
 mod config;
 #[allow(dead_code)]
 mod error;
-mod zmsg;
 mod request_meta;
 mod storage;
 mod zap_proxy;
@@ -30,7 +29,6 @@ use config::Config;
 use czmq::{ZCert, ZFrame, ZMsg, ZSock, ZSockType};
 use error::{Error, Result};
 use inauth_client::{CertType, ZapHandler};
-use zmsg::ZMsgExtended;
 use std::cell::RefCell;
 use std::fmt::{Debug, Display};
 use std::rc::Rc;
@@ -38,7 +36,7 @@ use std::result::Result as StdResult;
 use std::process::exit;
 use storage::{PersistDisk, PersistenceAdaptor};
 use zap_proxy::{ZapProxy, ZapPublisher, ZapSubscriber};
-use zdaemon::{Api, Error as DError, Service};
+use zdaemon::{Api, Error as DError, Service, ZMsgExtended};
 
 fn main() {
     let mut service: Service<Config> = try_exit(Service::load("auth.json"));
@@ -81,9 +79,10 @@ fn error_handler(sock: &ZSock, result: Result<()>) -> StdResult<(), DError> {
     match result {
         Ok(_) => Ok(()),
         Err(e) => {
-            let msg = try!(ZMsg::new_err(&e));
+            let derror: DError = e.into();
+            let msg = try!(ZMsg::new_err(&derror));
             try!(msg.send(sock));
-            Err(e.into())
+            Err(derror)
         }
     }
 }

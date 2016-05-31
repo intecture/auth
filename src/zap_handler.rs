@@ -10,8 +10,8 @@ use cert::CertType;
 use cert_cache::CertCache;
 use czmq::{ZCert, ZFrame, ZMsg, ZPoller, ZSock, ZSockType};
 use error::{Error, Result};
-use zmsg::ZMsgExtended;
 use std::thread::{JoinHandle, spawn};
+use zdaemon::ZMsgExtended;
 use zmq::z85_encode;
 
 const ZAP_ENDPOINT: &'static str = "inproc://zeromq.zap.01";

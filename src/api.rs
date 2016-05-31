@@ -10,11 +10,11 @@ use cert::{Cert, CertType};
 use cert_cache::CertCache;
 use czmq::{ZFrame, ZMsg, ZSock};
 use error::{Error, Result};
-use zmsg::ZMsgExtended;
 use std::cell::RefCell;
 use std::rc::Rc;
 use storage::PersistenceAdaptor;
 use request_meta::RequestMeta;
+use zdaemon::ZMsgExtended;
 
 pub struct CertApi<P> {
     persistence: P,
@@ -138,7 +138,7 @@ mod tests {
     use storage::{PersistenceAdaptor, PersistDisk};
     use super::*;
     use tempdir::TempDir;
-    use zmsg::ZMsgExtended;
+    use zdaemon::ZMsgExtended;
 
     #[test]
     fn test_lookup() {

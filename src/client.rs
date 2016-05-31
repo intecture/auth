@@ -21,8 +21,6 @@ mod cert_cache;
 #[allow(dead_code)]
 mod error;
 mod zap_handler;
-#[allow(dead_code)]
-mod zmsg;
 
 pub use cert::CertType;
 pub use zap_handler::ZapHandler;
