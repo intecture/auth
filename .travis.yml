@@ -23,6 +23,7 @@ before_script:
       export LD_LIBRARY_PATH=$HOME/lib &&
       export PKG_CONFIG_PATH=$HOME/lib/pkgconfig &&
 
+      cd /tmp
       curl -sSOL https://download.libsodium.org/libsodium/releases/libsodium-1.0.8.tar.gz &&
       curl -sSOL https://download.libsodium.org/libsodium/releases/libsodium-1.0.8.tar.gz.sig &&
       curl -sSOL https://download.libsodium.org/jedi.gpg.asc &&
@@ -42,11 +43,12 @@ before_script:
       git clone https://github.com/zeromq/czmq &&
       cd czmq &&
       ./autogen.sh && ./configure --prefix=$HOME && make && make install &&
-      cd ..
+      cd $TRAVIS_BUILD_DIR
 
 script:
   - travis-cargo build
   - travis-cargo test
+  - travis-cargo bench
 
 after_success:
   - travis-cargo coveralls --no-sudo --verify
