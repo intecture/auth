@@ -53,11 +53,11 @@ impl ZapPublisher {
 }
 
 impl Endpoint for ZapPublisher {
-    fn get_socket(&self) -> &ZSock {
-        &self.proxy.publisher
+    fn get_sockets(&self) -> Vec<&ZSock> {
+        vec![&self.proxy.publisher]
     }
 
-    fn recv(&mut self) -> StdResult<(), DError> {
+    fn recv(&mut self, _: &ZSock) -> StdResult<(), DError> {
         let frame = try!(ZFrame::recv(&self.proxy.publisher));
 
         let bytes = match try!(frame.data()) {
@@ -98,11 +98,11 @@ impl ZapSubscriber {
 }
 
 impl Endpoint for ZapSubscriber {
-    fn get_socket(&self) -> &ZSock {
-        &self.proxy.publisher
+    fn get_sockets(&self) -> Vec<&ZSock> {
+        vec![&self.proxy.publisher]
     }
 
-    fn recv(&mut self) -> StdResult<(), DError> {
+    fn recv(&mut self, _: &ZSock) -> StdResult<(), DError> {
         // Cache certificate
         let proxy = Rc::get_mut(&mut self.proxy).unwrap();
         let msg = try!(proxy.cache.borrow_mut().recv(&proxy.subscriber));
@@ -152,12 +152,14 @@ mod tests {
             cache: Rc::new(RefCell::new(cache)),
         });
 
+        let fake = ZSock::new(ZSockType::REP);
+
         let mut publisher = ZapPublisher::new(proxy);
 
         let client = ZSock::new_sub("inproc://zap_proxy_test_publisher", Some("user")).unwrap();
         client.set_rcvtimeo(Some(500));
 
-        publisher.recv().unwrap();
+        publisher.recv(&fake).unwrap();
         let msg = ZMsg::recv(&client).unwrap();
         msg.popstr().unwrap().unwrap(); // Discard topic
         assert_eq!(msg.popstr().unwrap().unwrap(), "ADD");
@@ -165,11 +167,11 @@ mod tests {
         assert_eq!(msg.popbytes().unwrap().unwrap(), user_meta);
 
         client.set_unsubscribe("user");
-        publisher.recv().unwrap();
+        publisher.recv(&fake).unwrap();
         assert!(client.recv_str().is_err());
 
         client.set_subscribe("");
-        publisher.recv().unwrap();
+        publisher.recv(&fake).unwrap();
         let msg = ZMsg::recv(&client).unwrap();
         msg.popstr().unwrap().unwrap(); // Discard topic
         assert_eq!(msg.popstr().unwrap().unwrap(), "ADD");
@@ -201,6 +203,8 @@ mod tests {
         let xsub = ZSock::new_xsub("@inproc://zap_proxy_test_subscriber").unwrap();
         xsub.set_rcvtimeo(Some(500));
 
+        let fake = ZSock::new(ZSockType::REP);
+
         let proxy = Rc::new(ZapProxy {
             publisher: xpub,
             subscriber: xsub,
@@ -222,7 +226,7 @@ mod tests {
         msg.addbytes(&user_meta).unwrap();
         msg.send(&server).unwrap();
 
-        subscriber.recv().unwrap();
+        subscriber.recv(&fake).unwrap();
         assert!(subscriber.proxy.cache.borrow().get(&user_pubkey).is_some());
 
         let msg = ZMsg::new();
@@ -232,7 +236,7 @@ mod tests {
         msg.addbytes(&host_meta).unwrap();
         msg.send(&server).unwrap();
 
-        subscriber.recv().unwrap();
+        subscriber.recv(&fake).unwrap();
         assert!(subscriber.proxy.cache.borrow().get(&host_pubkey).is_some());
     }
 }
