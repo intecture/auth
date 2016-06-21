@@ -118,7 +118,7 @@ impl Endpoint for ZapSubscriber {
 mod tests {
     use cert::{Cert, CertType};
     use cert_cache::CertCache;
-    use czmq::{zsys_init, ZFrame, ZMsg, ZSock, ZSockType};
+    use czmq::{ZFrame, ZMsg, ZSock, ZSockType, ZSys};
     use std::cell::RefCell;
     use std::rc::Rc;
     use super::*;
@@ -126,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_publisher() {
-        zsys_init();
+        ZSys::init();
 
         let user_cert = Cert::new("john.smith", CertType::User).unwrap();
         let user_pubkey = user_cert.public_txt().to_string();
@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn test_subscriber() {
-        zsys_init();
+        ZSys::init();
 
         let user_cert = Cert::new("john.smith", CertType::User).unwrap();
         let user_pubkey = user_cert.public_txt().to_string();

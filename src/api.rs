@@ -133,7 +133,7 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
 mod tests {
     use cert::{Cert, CertType};
     use cert_cache::CertCache;
-    use czmq::{zsys_init, ZMsg, ZSock};
+    use czmq::{ZMsg, ZSock, ZSys};
     use std::cell::RefCell;
     use std::rc::Rc;
     use storage::{PersistenceAdaptor, PersistDisk};
@@ -143,7 +143,7 @@ mod tests {
 
     #[test]
     fn test_lookup() {
-        zsys_init();
+        ZSys::init();
 
         let cert = Cert::new("r2d2", CertType::Host).unwrap();
         let (_dir, mut api) = create_api(">inproc://api_test_lookup_publisher", Some(&cert));
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn test_create() {
-        zsys_init();
+        ZSys::init();
 
         let (_dir, mut api) = create_api(">inproc://api_test_create_publisher", None);
 
@@ -191,7 +191,7 @@ mod tests {
 
     #[test]
     fn test_delete() {
-        zsys_init();
+        ZSys::init();
 
         let cert = Cert::new("c3po", CertType::Host).unwrap();
         let (_dir, mut api) = create_api(">inproc://api_test_delete_publisher", Some(&cert));

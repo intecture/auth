@@ -84,7 +84,7 @@ impl Worker {
         try!(poller.add(&self.comm));
 
         loop {
-            let sock: Option<ZSock> = try!(poller.wait(None));
+            let sock: Option<ZSock> = poller.wait(None);
             if let Some(sock) = sock {
                 if sock == self.zap {
                     // These frames are system defined. We can safely
@@ -204,14 +204,14 @@ impl<'a> ZapRequest<'a> {
 #[cfg(test)]
 mod tests {
     use cert::{Cert, CertType};
-    use czmq::{zsys_init, ZCert, ZMsg, ZSock, ZSockType};
+    use czmq::{ZCert, ZMsg, ZSock, ZSockType, ZSys};
     use std::thread::sleep;
     use std::time::Duration;
     use super::*;
 
     #[test]
     fn test_auth() {
-        zsys_init();
+        ZSys::init();
 
         let cert = Cert::new("jimbob", CertType::User).unwrap();
 

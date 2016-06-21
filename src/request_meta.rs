@@ -43,12 +43,12 @@ impl RequestMeta {
 
 #[cfg(test)]
 mod tests {
-    use czmq::{zsys_init, ZCert, ZFrame, ZMsg, ZSock, ZSockType};
+    use czmq::{ZCert, ZFrame, ZMsg, ZSock, ZSockType, ZSys};
     use super::*;
 
     #[test]
     fn test_new() {
-        zsys_init();
+        ZSys::init();
 
         let zap = ZSock::new_rep("inproc://zeromq.zap.01").unwrap();
 
