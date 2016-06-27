@@ -19,6 +19,7 @@ pub trait PersistenceAdaptor {
     fn create(&mut self, cert: &Cert) -> Result<Self::PK>;
     fn read(&mut self, name: &str) -> Result<Cert>;
     fn read_pubkey(&mut self, pubkey: &str) -> Result<Cert>;
-    fn delete(&mut self, pubkey: &str) -> Result<()>;
+    fn delete(&mut self, name: &str) -> Result<()>;
+    fn delete_pubkey(&mut self, pubkey: &str) -> Result<()>;
     fn dump(&mut self) -> Result<Vec<Cert>>;
 }

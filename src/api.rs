@@ -107,20 +107,20 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
     // Allow testing without auth
     fn do_delete(&mut self, sock: &ZSock) -> Result<()> {
         let request = try!(ZMsg::expect_recv(sock, 1, Some(1), false));
-        let pubkey: String = match request.popstr().unwrap() {
+        let name: String = match request.popstr().unwrap() {
             Ok(n) => n,
             Err(_) => return Err(Error::InvalidCert),
         };
 
-        let cert = try!(self.persistence.read_pubkey(&pubkey));
+        let cert = try!(self.persistence.read(&name));
 
-        try!(self.persistence.delete(&pubkey));
+        try!(self.persistence.delete(&name));
 
         let msg = ZMsg::new();
         try!(msg.send_multi(&self.publisher, &[
             cert.cert_type().to_str(),
             "DEL",
-            &pubkey,
+            &cert.public_txt(),
         ]));
 
         try!(sock.send_str("Ok"));
@@ -205,7 +205,7 @@ mod tests {
         server.send_str("").unwrap();
         client.recv_str().unwrap().unwrap();
 
-        client.send_str(cert.public_txt()).unwrap();
+        client.send_str("c3po").unwrap();
         assert!(api.do_delete(&server).is_ok());
 
         let reply = ZMsg::recv(&client).unwrap();

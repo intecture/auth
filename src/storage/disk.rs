@@ -71,7 +71,7 @@ impl PersistenceAdaptor for PersistDisk {
     fn read(&mut self, name: &str) -> Result<Cert> {
         let cert_path = format!("{}/{}.crt", &self.path, name);
 
-        // Replace with own cert template
+        // XXX Replace with own cert template
         let cert = try!(Cert::from_zcert(try!(ZCert::load(&cert_path))));
 
         self.name_cache.insert(cert.name().to_string(), cert.public_txt().to_string());
@@ -88,11 +88,16 @@ impl PersistenceAdaptor for PersistDisk {
         }
     }
 
-    fn delete(&mut self, pubkey: &str) -> Result<()> {
+    fn delete(&mut self, name: &str) -> Result<()> {
+        try!(remove_file(&format!("{}/{}.crt", &self.path, name)));
+        self.name_cache.remove(name);
+        Ok(())
+    }
+
+    fn delete_pubkey(&mut self, pubkey: &str) -> Result<()> {
         match self.pubkey_to_name(pubkey) {
             Some(name) => {
-                try!(remove_file(&format!("{}/{}.crt", &self.path, &name)));
-                self.name_cache.remove(&name);
+                try!(self.delete(&name));
                 Ok(())
             },
             None => Err(Error::InvalidCert),
@@ -179,7 +184,7 @@ mod tests {
         assert!(disk.delete("fakepk").is_err());
 
         disk.create(&cert).unwrap();
-        assert!(disk.delete(cert.public_txt()).is_ok());
+        assert!(disk.delete("test_user").is_ok());
     }
 
     #[test]
