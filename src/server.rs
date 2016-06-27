@@ -64,11 +64,13 @@ fn main() {
 
     let api_create = Rc::new(RefCell::new(try_exit(CertApi::new(persistence, cert_cache.clone()))));
     let api_delete = api_create.clone();
+    let api_list = api_create.clone();
     let api_lookup = api_create.clone();
 
     let mut api = Api::new(api_sock);
     api.add("cert::create", move |sock: &ZSock, endpoint_frame: ZFrame| { error_handler(sock, api_create.borrow_mut().create(sock, endpoint_frame)) });
     api.add("cert::delete", move |sock: &ZSock, endpoint_frame: ZFrame| { error_handler(sock, api_delete.borrow_mut().delete(sock, endpoint_frame)) });
+    api.add("cert::list", move |sock: &ZSock, _: ZFrame| { error_handler(sock, api_list.borrow_mut().list(sock)) });
     api.add("cert::lookup", move |sock: &ZSock, _: ZFrame| { error_handler(sock, api_lookup.borrow_mut().lookup(sock)) });
     try_exit(service.add_endpoint(api));
 

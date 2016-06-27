@@ -48,6 +48,18 @@ impl CertCache {
         None
     }
 
+    pub fn dump(&self, cert_type: CertType) -> Vec<&Cert> {
+        let mut dump = Vec::new();
+
+        for (_, cert) in &self.cache {
+            if cert.cert_type() == cert_type {
+                dump.push(cert);
+            }
+        }
+
+        dump
+    }
+
     pub fn send(&self, sock: &ZSock, topic: Option<CertType>) -> Result<()> {
         let msg = ZMsg::new();
         match topic {

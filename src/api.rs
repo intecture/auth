@@ -31,6 +31,21 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
         })
     }
 
+    pub fn list(&mut self, sock: &ZSock) -> Result<()> {
+        let msg = try!(ZMsg::expect_recv(sock, 1, Some(1), false));
+        let cert_type = match msg.popstr().unwrap() {
+            Ok(str) => str,
+            Err(_) => return Err(Error::InvalidArg),
+        };
+
+        let reply = try!(ZMsg::new_ok());
+        for cert in self.cert_cache.borrow().dump(try!(CertType::from_str(&cert_type))) {
+            try!(reply.addstr(cert.name()));
+        }
+        try!(reply.send(sock));
+        Ok(())
+    }
+
     pub fn lookup(&mut self, sock: &ZSock) -> Result<()> {
         let msg = try!(ZMsg::expect_recv(sock, 1, Some(1), false));
         let name = match msg.popstr().unwrap() {
@@ -142,11 +157,36 @@ mod tests {
     use zdaemon::ZMsgExtended;
 
     #[test]
+    fn test_list() {
+        ZSys::init();
+
+        let host = Cert::new("luke.jedi.org", CertType::Host).unwrap();
+        let user = Cert::new("luke_vader", CertType::User).unwrap();
+        let (_dir, mut api) = create_api(">inproc://api_test_list_publisher", Some(vec![&host, &user]));
+
+        let (client, server) = ZSys::create_pipe().unwrap();
+
+        client.send_str("user").unwrap();
+        api.list(&server).unwrap();
+
+        let reply = ZMsg::recv(&client).unwrap();
+        assert_eq!(reply.popstr().unwrap().unwrap(), "Ok");
+        assert_eq!(reply.popstr().unwrap().unwrap(), "luke_vader");
+
+        client.send_str("host").unwrap();
+        api.list(&server).unwrap();
+
+        let reply = ZMsg::recv(&client).unwrap();
+        assert_eq!(reply.popstr().unwrap().unwrap(), "Ok");
+        assert_eq!(reply.popstr().unwrap().unwrap(), "luke.jedi.org");
+    }
+
+    #[test]
     fn test_lookup() {
         ZSys::init();
 
         let cert = Cert::new("r2d2", CertType::Host).unwrap();
-        let (_dir, mut api) = create_api(">inproc://api_test_lookup_publisher", Some(&cert));
+        let (_dir, mut api) = create_api(">inproc://api_test_lookup_publisher", Some(vec![&cert]));
 
         let client = ZSock::new_req("inproc://api_test_lookup").unwrap();
         let server = ZSock::new_rep("inproc://api_test_lookup").unwrap();
@@ -194,7 +234,7 @@ mod tests {
         ZSys::init();
 
         let cert = Cert::new("c3po", CertType::Host).unwrap();
-        let (_dir, mut api) = create_api(">inproc://api_test_delete_publisher", Some(&cert));
+        let (_dir, mut api) = create_api(">inproc://api_test_delete_publisher", Some(vec![&cert]));
 
         let subscriber = ZSock::new_sub("@inproc://api_test_delete_publisher", Some("host")).unwrap();
         let client = ZSock::new_req("inproc://api_test_delete").unwrap();
@@ -217,12 +257,14 @@ mod tests {
         assert_eq!(sub_reply.popstr().unwrap().unwrap(), cert.public_txt());
     }
 
-    fn create_api(endpoint: &str, cert: Option<&Cert>) -> (TempDir, CertApi<PersistDisk>) {
+    fn create_api(endpoint: &str, certs: Option<Vec<&Cert>>) -> (TempDir, CertApi<PersistDisk>) {
         let dir = TempDir::new("test_api").unwrap();
 
         let mut disk = PersistDisk::new(dir.path().to_str().unwrap()).unwrap();
-        if let Some(cert) = cert {
-            disk.create(cert).unwrap();
+        if let Some(certs) = certs {
+            for cert in certs {
+                disk.create(cert).unwrap();
+            }
         }
 
         let cert_cache = Rc::new(RefCell::new(CertCache::new(Some(disk.dump().unwrap()))));
