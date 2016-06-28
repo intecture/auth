@@ -76,10 +76,12 @@ impl Cert {
         })
     }
 
+    #[allow(dead_code)]
     pub fn cert_type(&self) -> CertType {
         self.cert_type
     }
 
+    #[allow(dead_code)]
     pub fn name(&self) -> &str {
         &self.name
     }
