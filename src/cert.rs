@@ -18,6 +18,7 @@ pub enum CertType {
 }
 
 impl CertType {
+    #[allow(dead_code)]
     pub fn from_str(ctype: &str) -> Result<CertType> {
         match ctype {
             "host" => Ok(CertType::Host),
@@ -56,6 +57,7 @@ impl Cert {
         })
     }
 
+    #[allow(dead_code)]
     pub fn from_zcert(zcert: ZCert) -> Result<Cert> {
         let name = if let Some(Ok(n)) = zcert.meta("name") {
             n
