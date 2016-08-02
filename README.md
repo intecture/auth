@@ -1,4 +1,4 @@
-# Intecture [![Build Status](https://travis-ci.org/betweenlines/intecture-auth.svg?branch=master)](https://travis-ci.org/betweenlines/intecture-auth) [![Coverage Status](https://coveralls.io/repos/github/betweenlines/intecture-auth/badge.svg?branch=dev)](https://coveralls.io/github/betweenlines/intecture-auth?branch=dev)
+# Intecture [![Build Status](https://travis-ci.org/intecture/auth.svg?branch=master)](https://travis-ci.org/intecture/auth) [![Coverage Status](https://coveralls.io/repos/github/intecture/auth/badge.svg?branch=master)](https://coveralls.io/github/intecture/auth?branch=master)
 
 Intecture is a developer friendly, language agnostic configuration management tool for server systems.
 
@@ -25,8 +25,8 @@ First, as this project is written in Rust, you'll need...well, [Rust!](https://w
 Next, clone this repository to your local machine and use the Makefile to build it:
 
 ```
-$ git clone #...
-$ cd intecture-auth/
+$ git clone https://github.com/intecture/auth
+$ cd auth/
 $ make
 $ make test && sudo make install
 ```
@@ -40,7 +40,7 @@ Once this has finished, you should have a shiny new binary called *inauthserv*, 
 Run the uninstall target on the Makefile:
 
 ```
-$ cd intecture-auth/
+$ cd auth/
 $ sudo make uninstall
 ```
 
