@@ -1,4 +1,3 @@
-UNAME_S := $(shell uname -s)
 CARGO := $(shell which cargo)
 TARGET = release
 PREFIX = /usr/local
