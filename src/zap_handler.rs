@@ -32,11 +32,14 @@ impl Drop for ZapHandler {
 
 impl ZapHandler {
     // Seperate new() and run_worker() to allow for mocking sockets
-    pub fn new(cert_type: CertType, cert: &ZCert, auth_cert: &ZCert, auth_server: &str, auth_port: u32, allow_self: bool) -> Result<ZapHandler> {
+    pub fn new(cert_type: Option<CertType>, cert: &ZCert, auth_cert: &ZCert, auth_server: &str, auth_port: u32, allow_self: bool) -> Result<ZapHandler> {
         let zap = try!(ZSock::new_rep(ZAP_ENDPOINT));
 
         let subscriber = ZSock::new(ZSockType::SUB);
-        subscriber.set_subscribe(cert_type.to_str());
+        match cert_type {
+            Some(ct) => subscriber.set_subscribe(ct.to_str()),
+            None => subscriber.set_subscribe(""),
+        }
         subscriber.set_curve_serverkey(auth_cert.public_txt());
         cert.apply(&subscriber);
         try!(subscriber.connect(&format!("tcp://{}:{}", auth_server, auth_port)));

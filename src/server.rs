@@ -61,7 +61,7 @@ fn main() {
 
     let proxy = Rc::new(try_exit(ZapProxy::new(&server_cert, service.get_config().unwrap().update_port, cert_cache.clone())));
 
-    let _auth = ZapHandler::new(CertType::User, &server_cert, &server_cert, "127.0.0.1", service.get_config().unwrap().update_port, true);
+    let _auth = ZapHandler::new(None, &server_cert, &server_cert, "127.0.0.1", service.get_config().unwrap().update_port, true);
 
     let zap_publisher = ZapPublisher::new(proxy.clone());
     try_exit(service.add_endpoint(zap_publisher));
