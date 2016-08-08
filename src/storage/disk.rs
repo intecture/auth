@@ -32,9 +32,7 @@ impl PersistDisk {
         };
 
         // Warm up name cache
-        for entry in try!(read_dir(path)) {
-            try!(me.read(&try!(entry).file_name().to_str().unwrap()));
-        }
+        try!(me.dump());
 
         Ok(me)
     }

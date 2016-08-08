@@ -78,7 +78,7 @@ impl Endpoint for ZapPublisher {
             }
         }
 
-        // Pass subscription frame to publisher
+        // Pass subscription frame to publisher (XSUB)
         try!(frame.send(&self.proxy.subscriber, None));
 
         Ok(())
@@ -107,7 +107,7 @@ impl Endpoint for ZapSubscriber {
         let proxy = Rc::get_mut(&mut self.proxy).unwrap();
         let msg = try!(proxy.cache.borrow_mut().recv(&proxy.subscriber));
 
-        // Forward message to subscriber
+        // Forward message to subscriber (XPUB)
         try!(msg.send(&proxy.publisher));
 
         Ok(())

@@ -31,6 +31,7 @@ use error::{Error, Result};
 use inauth_client::{CertType, ZapHandler};
 use std::cell::RefCell;
 use std::fmt::{Debug, Display};
+use std::fs::metadata;
 use std::rc::Rc;
 use std::result::Result as StdResult;
 use std::process::exit;
@@ -40,7 +41,19 @@ use zdaemon::{Api, Error as DError, Service, ZMsgExtended};
 
 fn main() {
     let mut service: Service<Config> = try_exit(Service::load("auth.json"));
-    let server_cert = try_exit(ZCert::load(&service.get_config().unwrap().server_cert));
+
+    // Create new server cert if missing
+    let server_cert = match metadata(&service.get_config().unwrap().server_cert) {
+        Ok(_) => try_exit(ZCert::load(&service.get_config().unwrap().server_cert)),
+        Err(_) => {
+            let c = try_exit(ZCert::new());
+            c.set_meta("name", "auth");
+            c.set_meta("type", CertType::Host.to_str());
+            try_exit(c.save_public(&format!("{}_public", &service.get_config().unwrap().server_cert)));
+            try_exit(c.save_secret(&service.get_config().unwrap().server_cert));
+            c
+        }
+    };
 
     let mut persistence = try_exit(PersistDisk::new(&service.get_config().unwrap().cert_path));
 
@@ -48,7 +61,7 @@ fn main() {
 
     let proxy = Rc::new(try_exit(ZapProxy::new(&server_cert, service.get_config().unwrap().update_port, cert_cache.clone())));
 
-    let _auth = ZapHandler::new(CertType::User, &server_cert, &server_cert, "127.0.0.1", service.get_config().unwrap().update_port);
+    let _auth = ZapHandler::new(CertType::User, &server_cert, &server_cert, "127.0.0.1", service.get_config().unwrap().update_port, true);
 
     let zap_publisher = ZapPublisher::new(proxy.clone());
     try_exit(service.add_endpoint(zap_publisher));

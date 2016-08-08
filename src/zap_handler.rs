@@ -6,10 +6,11 @@
 // https://www.tldrlegal.com/l/mpl-2.0>. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use cert::CertType;
+use cert::{Cert, CertType};
 use cert_cache::CertCache;
 use czmq::{ZCert, ZFrame, ZMsg, ZPoller, ZSock, ZSockType};
 use error::{Error, Result};
+use std::fmt;
 use std::thread::{JoinHandle, spawn};
 use zdaemon::ZMsgExtended;
 use zmq::z85_encode;
@@ -31,7 +32,7 @@ impl Drop for ZapHandler {
 
 impl ZapHandler {
     // Seperate new() and run_worker() to allow for mocking sockets
-    pub fn new(cert_type: CertType, cert: &ZCert, auth_cert: &ZCert, auth_server: &str, auth_port: u32) -> Result<ZapHandler> {
+    pub fn new(cert_type: CertType, cert: &ZCert, auth_cert: &ZCert, auth_server: &str, auth_port: u32, allow_self: bool) -> Result<ZapHandler> {
         let zap = try!(ZSock::new_rep(ZAP_ENDPOINT));
 
         let subscriber = ZSock::new(ZSockType::SUB);
@@ -40,16 +41,27 @@ impl ZapHandler {
         cert.apply(&subscriber);
         try!(subscriber.connect(&format!("tcp://{}:{}", auth_server, auth_port)));
 
-        Self::run_worker(zap, subscriber)
+        let seed = if allow_self {
+            // Copy cert to new owned cert
+            let c = ZCert::from_keys(cert.public_key(), cert.secret_key());
+            c.set_meta("name", &cert.meta("name").unwrap().unwrap());
+            c.set_meta("type", &cert.meta("type").unwrap().unwrap());
+            Some(vec![try!(Cert::from_zcert(c))])
+        } else {
+            None
+        };
+        let cache = CertCache::new(seed);
+
+        Self::run_worker(zap, subscriber, cache)
     }
 
-    fn run_worker(zap: ZSock, subscriber: ZSock) -> Result<ZapHandler> {
+    fn run_worker(zap: ZSock, subscriber: ZSock, cache: CertCache) -> Result<ZapHandler> {
         let comm = try!(ZSock::new_push("@inproc://zap_handler_term"));
         let comm_child = try!(ZSock::new_pull(">inproc://zap_handler_term"));
 
         Ok(ZapHandler {
             worker: Some(spawn(move || {
-                let mut w = Worker::new(zap, subscriber, comm_child);
+                let mut w = Worker::new(zap, subscriber, comm_child, cache);
                 if let Err(_e) = w.run() {
                     println!("ZAP Error: {:?}", _e);
                     // XXX impl error_handler()
@@ -68,12 +80,12 @@ struct Worker {
 }
 
 impl Worker {
-    fn new(zap: ZSock, subscriber: ZSock, comm: ZSock) -> Worker {
+    fn new(zap: ZSock, subscriber: ZSock, comm: ZSock, cache: CertCache) -> Worker {
         Worker {
             zap: zap,
             subscriber: subscriber,
             comm: comm,
-            cache: CertCache::new(None),
+            cache: cache,
         }
     }
 
@@ -201,9 +213,23 @@ impl<'a> ZapRequest<'a> {
     }
 }
 
+impl<'a> fmt::Debug for ZapRequest<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ZapRequest {{ version: {}, sequence: {}, domain: {}, address: {}, identity: {}, mechanism: {}, client_pk: {} }}",
+            self._version,
+            self.sequence,
+            self._domain,
+            self._address,
+            self._identity,
+            self.mechanism,
+            self.client_pk)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use cert::{Cert, CertType};
+    use cert_cache::CertCache;
     use czmq::{ZCert, ZMsg, ZSock, ZSockType, ZSys};
     use std::thread::sleep;
     use std::time::Duration;
@@ -228,7 +254,7 @@ mod tests {
         subscriber.set_subscribe(CertType::User.to_str());
         subscriber.connect("inproc://zap_handler_test_pub").unwrap();
 
-        let _handler = ZapHandler::run_worker(zap_server, subscriber).unwrap();
+        let _handler = ZapHandler::run_worker(zap_server, subscriber, CertCache::new(None)).unwrap();
 
         let zap_msg = new_zap_msg(&cert);
         zap_msg.send(&zap).unwrap();

@@ -27,7 +27,7 @@ path = "src/client.rs"
 
 [[bin]]
 
-name = "inauth_server"
+name = "inauth"
 path = "src/server.rs"
 
 [[bin]]

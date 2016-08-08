@@ -31,7 +31,10 @@ static USAGE: &'static str = "
 Intecture Auth.
 
 Usage:
-  inauth_cli user add <username>
+  inauth_cli user add [(-s | --silent)] <username>
+
+  Options:
+    -s --silent     Save private key instead of printing it.
 ";
 
 #[derive(Debug, RustcDecodable)]
@@ -39,6 +42,8 @@ struct Args {
     cmd_add: bool,
     cmd_user: bool,
     arg_username: String,
+    flag_s: bool,
+    flag_silent: bool,
 }
 
 fn main() {
@@ -50,6 +55,16 @@ fn main() {
         let config = try_exit(load_conf("auth.json", &["/usr/local/etc", "/etc"]));
         let cert = try_exit(Cert::new(&args.arg_username, CertType::User));
         try_exit(cert.save_public(&format!("{}/{}.crt", &config.cert_path, &args.arg_username)));
+
+        if args.flag_s || args.flag_silent {
+            try_exit(cert.save_secret(&format!("{}.crt", &args.arg_username)));
+        } else {
+            println!("Please distribute this certificate securely.
+
+------------------------COPY BELOW THIS LINE-------------------------
+{}
+------------------------COPY ABOVE THIS LINE-------------------------", cert.secret_txt());
+        }
     }
 }
 
