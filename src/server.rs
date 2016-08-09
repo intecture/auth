@@ -56,17 +56,14 @@ fn main() {
     };
 
     let mut persistence = try_exit(PersistDisk::new(&service.get_config().unwrap().cert_path));
-
     let cert_cache = Rc::new(RefCell::new(CertCache::new(Some(try_exit(persistence.dump())))));
 
-    let proxy = Rc::new(try_exit(ZapProxy::new(&server_cert, service.get_config().unwrap().update_port, cert_cache.clone())));
+    let proxy = Rc::new(try_exit(ZapProxy::new(&server_cert, service.get_config().unwrap().update_port)));
 
-    let _auth = ZapHandler::new(None, &server_cert, &server_cert, "127.0.0.1", service.get_config().unwrap().update_port, true);
-
-    let zap_publisher = ZapPublisher::new(proxy.clone());
+    let zap_publisher = ZapPublisher::new(proxy.clone(), cert_cache.clone());
     try_exit(service.add_endpoint(zap_publisher));
 
-    let zap_subscriber = ZapSubscriber::new(proxy.clone());
+    let zap_subscriber = ZapSubscriber::new(proxy.clone(), cert_cache.clone());
     try_exit(service.add_endpoint(zap_subscriber));
 
     let api_sock = ZSock::new(ZSockType::REP);
@@ -86,6 +83,8 @@ fn main() {
     api.add("cert::list", move |sock: &ZSock, _: ZFrame| { error_handler(sock, api_list.borrow_mut().list(sock)) });
     api.add("cert::lookup", move |sock: &ZSock, _: ZFrame| { error_handler(sock, api_lookup.borrow_mut().lookup(sock)) });
     try_exit(service.add_endpoint(api));
+
+    let _auth = ZapHandler::new(None, &server_cert, &server_cert, "127.0.0.1", service.get_config().unwrap().update_port, true);
 
     try_exit(service.start(None));
 }

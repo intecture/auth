@@ -26,7 +26,7 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
     pub fn new(persistence: P, cert_cache: Rc<RefCell<CertCache>>) -> Result<CertApi<P>> {
         Ok(CertApi {
             persistence: persistence,
-            publisher: try!(ZSock::new_pub(">inproc://auth_publisher")),
+            publisher: try!(ZSock::new_pub("inproc://auth_publisher")),
             cert_cache: cert_cache,
         })
     }

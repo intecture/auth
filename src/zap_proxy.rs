@@ -8,22 +8,21 @@
 
 use cert::CertType;
 use cert_cache::CertCache;
-use czmq::{ZCert, ZFrame, ZSock, ZSockType};
+use czmq::{ZCert, ZFrame, ZMsg, ZSock, ZSockType};
 use error::Result;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::result::Result as StdResult;
 use std::str;
-use zdaemon::{Endpoint, Error as DError};
+use zdaemon::{Endpoint, Error as DError, ZMsgExtended};
 
 pub struct ZapProxy {
     publisher: ZSock,
     subscriber: ZSock,
-    cache: Rc<RefCell<CertCache>>,
 }
 
 impl ZapProxy {
-    pub fn new(cert: &ZCert, update_port: u32, cache: Rc<RefCell<CertCache>>) -> Result<ZapProxy> {
+    pub fn new(cert: &ZCert, update_port: u32) -> Result<ZapProxy> {
         let xpub = ZSock::new(ZSockType::XPUB);
         xpub.set_zap_domain("auth.intecture");
         xpub.set_curve_server(true);
@@ -35,19 +34,20 @@ impl ZapProxy {
         Ok(ZapProxy {
             publisher: xpub,
             subscriber: xsub,
-            cache: cache,
         })
     }
 }
 
 pub struct ZapPublisher {
     proxy: Rc<ZapProxy>,
+    cache: Rc<RefCell<CertCache>>,
 }
 
 impl ZapPublisher {
-    pub fn new(proxy: Rc<ZapProxy>) -> ZapPublisher {
+    pub fn new(proxy: Rc<ZapProxy>, cache: Rc<RefCell<CertCache>>) -> ZapPublisher {
         ZapPublisher {
             proxy: proxy,
+            cache: cache,
         }
     }
 }
@@ -74,12 +74,16 @@ impl Endpoint for ZapPublisher {
                     let topic = try!(str::from_utf8(&topic_bytes));
                     Some(try!(CertType::from_str(topic)))
                 };
-                try!(self.proxy.cache.borrow().send(&self.proxy.publisher, cert_type));
+                try!(self.cache.borrow().send(&self.proxy.publisher, cert_type));
             }
         }
 
-        // Pass subscription frame to publisher (XSUB)
-        try!(frame.send(&self.proxy.subscriber, None));
+        // Receive any unreceived frames
+        let msg = try!(ZMsg::expect_recv(&self.proxy.publisher, 0, None, false));
+        try!(msg.prepend(frame));
+
+        // Pass subscription frame to publishers
+        try!(msg.send(&self.proxy.subscriber));
 
         Ok(())
     }
@@ -87,28 +91,29 @@ impl Endpoint for ZapPublisher {
 
 pub struct ZapSubscriber {
     proxy: Rc<ZapProxy>,
+    cache: Rc<RefCell<CertCache>>,
 }
 
 impl ZapSubscriber {
-    pub fn new(proxy: Rc<ZapProxy>) -> ZapSubscriber {
+    pub fn new(proxy: Rc<ZapProxy>, cache: Rc<RefCell<CertCache>>) -> ZapSubscriber {
         ZapSubscriber {
             proxy: proxy,
+            cache: cache,
         }
     }
 }
 
 impl Endpoint for ZapSubscriber {
     fn get_sockets(&self) -> Vec<&ZSock> {
-        vec![&self.proxy.publisher]
+        vec![&self.proxy.subscriber]
     }
 
     fn recv(&mut self, _: &ZSock) -> StdResult<(), DError> {
         // Cache certificate
-        let proxy = Rc::get_mut(&mut self.proxy).unwrap();
-        let msg = try!(proxy.cache.borrow_mut().recv(&proxy.subscriber));
+        let msg = try!(self.cache.borrow_mut().recv(&self.proxy.subscriber));
 
         // Forward message to subscriber (XPUB)
-        try!(msg.send(&proxy.publisher));
+        try!(msg.send(&self.proxy.publisher));
 
         Ok(())
     }
@@ -149,12 +154,11 @@ mod tests {
         let proxy = Rc::new(ZapProxy {
             publisher: xpub,
             subscriber: xsub,
-            cache: Rc::new(RefCell::new(cache)),
         });
 
         let fake = ZSock::new(ZSockType::REP);
 
-        let mut publisher = ZapPublisher::new(proxy);
+        let mut publisher = ZapPublisher::new(proxy, Rc::new(RefCell::new(cache)));
 
         let client = ZSock::new_sub("inproc://zap_proxy_test_publisher", Some("user")).unwrap();
         client.set_rcvtimeo(Some(500));
@@ -208,10 +212,9 @@ mod tests {
         let proxy = Rc::new(ZapProxy {
             publisher: xpub,
             subscriber: xsub,
-            cache: Rc::new(RefCell::new(cache)),
         });
 
-        let mut subscriber = ZapSubscriber::new(proxy);
+        let mut subscriber = ZapSubscriber::new(proxy, Rc::new(RefCell::new(cache)));
 
         let server = ZSock::new_pub(">inproc://zap_proxy_test_subscriber").unwrap();
         server.set_sndtimeo(Some(500));
@@ -227,7 +230,7 @@ mod tests {
         msg.send(&server).unwrap();
 
         subscriber.recv(&fake).unwrap();
-        assert!(subscriber.proxy.cache.borrow().get(&user_pubkey).is_some());
+        assert!(subscriber.cache.borrow().get(&user_pubkey).is_some());
 
         let msg = ZMsg::new();
         msg.addstr("host").unwrap();
@@ -237,6 +240,6 @@ mod tests {
         msg.send(&server).unwrap();
 
         subscriber.recv(&fake).unwrap();
-        assert!(subscriber.proxy.cache.borrow().get(&host_pubkey).is_some());
+        assert!(subscriber.cache.borrow().get(&host_pubkey).is_some());
     }
 }

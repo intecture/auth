@@ -10,6 +10,7 @@ use czmq::{ZCert, ZMsg, ZSock};
 use error::{Error, Result};
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct CertCache {
     cache: HashMap<String, Cert>,
 }
