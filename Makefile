@@ -20,9 +20,7 @@ uninstall:
 	rm -f $(PREFIX)/bin/inauth
 	rm -f $(PREFIX)/bin/inauth_cli
 	rm -f $(PREFIX)/etc/intecture/auth.json
-	if [ ! "$(ls -A /$(PREFIX)/etc/intecture)" ]; then\
-		rmdir $(PREFIX)/etc/intecture; \\
-	fi
+	rmdir --ignore-fail-on-non-empty $(PREFIX)/etc/intecture
 
 test:
 ifeq ($(TARGET), release)
