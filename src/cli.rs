@@ -62,8 +62,13 @@ fn main() {
             println!("Please distribute this certificate securely.
 
 ------------------------COPY BELOW THIS LINE-------------------------
-{}
-------------------------COPY ABOVE THIS LINE-------------------------", cert.secret_txt());
+metadata
+    name = \"{}\"
+    type = \"user\"
+curve
+    public-key = \"{}\"
+    secret-key = \"{}\"
+------------------------COPY ABOVE THIS LINE-------------------------", args.arg_username, cert.public_txt(), cert.secret_txt());
         }
     }
 }

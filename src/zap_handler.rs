@@ -36,13 +36,13 @@ impl ZapHandler {
         let zap = try!(ZSock::new_rep(ZAP_ENDPOINT));
 
         let subscriber = ZSock::new(ZSockType::SUB);
+        subscriber.set_curve_serverkey(auth_cert.public_txt());
+        cert.apply(&subscriber);
+        try!(subscriber.connect(&format!("tcp://{}:{}", auth_server, auth_port)));
         match cert_type {
             Some(ct) => subscriber.set_subscribe(ct.to_str()),
             None => subscriber.set_subscribe(""),
         }
-        subscriber.set_curve_serverkey(auth_cert.public_txt());
-        cert.apply(&subscriber);
-        try!(subscriber.connect(&format!("tcp://{}:{}", auth_server, auth_port)));
 
         let seed = if allow_self {
             // Copy cert to new owned cert
