@@ -24,6 +24,7 @@ pub struct ZapProxy {
 impl ZapProxy {
     pub fn new(cert: &ZCert, update_port: u32) -> Result<ZapProxy> {
         let xpub = ZSock::new(ZSockType::XPUB);
+        xpub.set_xpub_verbose(true);
         xpub.set_zap_domain("auth.intecture");
         xpub.set_curve_server(true);
         cert.apply(&xpub);
