@@ -72,7 +72,7 @@ impl error::Error for Error {
             Error::InvalidZapRequest => "Invalid ZAP request",
             Error::Io(ref e) => e.description(),
             Error::JsonEncoder(ref e) => e.description(),
-            Error::MissingConf => "Cannot open Agent config",
+            Error::MissingConf => "Cannot open config",
             Error::ZapVersion => "ZAP version is invalid",
             Error::ZDaemon(ref e) => e.description(),
         }
