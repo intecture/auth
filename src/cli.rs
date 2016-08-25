@@ -59,7 +59,11 @@ fn main() {
         if args.flag_s || args.flag_silent {
             try_exit(cert.save_secret(&format!("{}.crt", &args.arg_username)));
         } else {
-            println!("Please distribute this certificate securely.
+            println!("**********
+* PLEASE NOTE: You must restart the Auth server before this certificate will become valid!
+**********
+
+Please distribute this certificate securely.
 
 ------------------------COPY BELOW THIS LINE-------------------------
 metadata
