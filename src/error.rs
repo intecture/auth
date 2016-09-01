@@ -29,6 +29,7 @@ pub enum Error {
     Io(io::Error),
     JsonEncoder(json::EncoderError),
     MissingConf,
+    PollerTimeout,
     ZapVersion,
     ZDaemon(zdaemon::Error),
 }
@@ -50,6 +51,7 @@ impl fmt::Display for Error {
             Error::Io(ref e) => write!(f, "IO error: {}", e),
             Error::JsonEncoder(ref e) => write!(f, "JSON encoder error: {}", e),
             Error::MissingConf => write!(f, "Cannot open Agent config"),
+            Error::PollerTimeout => write!(f, "Timeout while polling sockets"),
             Error::ZapVersion => write!(f, "ZAP version is invalid"),
             Error::ZDaemon(ref e) => write!(f, "ZDaemon error: {}", e),
         }
@@ -73,6 +75,7 @@ impl error::Error for Error {
             Error::Io(ref e) => e.description(),
             Error::JsonEncoder(ref e) => e.description(),
             Error::MissingConf => "Cannot open config",
+            Error::PollerTimeout => "Timeout while polling sockets",
             Error::ZapVersion => "ZAP version is invalid",
             Error::ZDaemon(ref e) => e.description(),
         }

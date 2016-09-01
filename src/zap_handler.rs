@@ -8,7 +8,7 @@
 
 use cert::{Cert, CertType};
 use cert_cache::CertCache;
-use czmq::{ZCert, ZFrame, ZMsg, ZPoller, ZSock, ZSockType};
+use czmq::{ZCert, ZFrame, ZMsg, ZPoller, ZSock, ZSockType, ZSys};
 use error::{Error, Result};
 use std::fmt;
 use std::thread::{JoinHandle, spawn};
@@ -25,8 +25,12 @@ pub struct ZapHandler {
 
 impl Drop for ZapHandler {
     fn drop(&mut self) {
-        self.thread_comm.send_str(THREAD_TERM).unwrap();
-        self.worker.take().unwrap().join().unwrap();
+        // Ignore failure as it means the thread has already
+        // terminated.
+        let _ = self.thread_comm.send_str(THREAD_TERM);
+        if let Some(h) = self.worker.take() {
+            h.join().unwrap();
+        }
     }
 }
 
@@ -34,10 +38,12 @@ impl ZapHandler {
     // Seperate new() and run_worker() to allow for mocking sockets
     pub fn new(cert_type: Option<CertType>, cert: &ZCert, auth_cert: &ZCert, auth_server: &str, auth_port: u32, allow_self: bool) -> Result<ZapHandler> {
         let zap = try!(ZSock::new_rep(ZAP_ENDPOINT));
+        zap.set_linger(0);
 
         let subscriber = ZSock::new(ZSockType::SUB);
         subscriber.set_curve_serverkey(auth_cert.public_txt());
         cert.apply(&subscriber);
+        subscriber.set_linger(0);
         try!(subscriber.connect(&format!("tcp://{}:{}", auth_server, auth_port)));
         match cert_type {
             Some(ct) => subscriber.set_subscribe(ct.to_str()),
@@ -59,8 +65,9 @@ impl ZapHandler {
     }
 
     fn run_worker(zap: ZSock, subscriber: ZSock, cache: CertCache) -> Result<ZapHandler> {
-        let comm = try!(ZSock::new_push("@inproc://zap_handler_term"));
-        let comm_child = try!(ZSock::new_pull(">inproc://zap_handler_term"));
+        let (comm, comm_child) = try!(ZSys::create_pipe());
+        comm.set_linger(0);
+        comm_child.set_linger(0);
 
         Ok(ZapHandler {
             worker: Some(spawn(move || {
@@ -123,6 +130,13 @@ impl Worker {
                 else if sock == self.comm && try!(self.comm.recv_str()).unwrap_or(String::new()) == THREAD_TERM {
                     break;
                 }
+            }
+
+            if poller.expired() {
+                return Err(Error::PollerTimeout);
+            }
+            else if poller.terminated() {
+                break;
             }
         }
 
