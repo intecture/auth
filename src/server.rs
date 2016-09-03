@@ -39,7 +39,6 @@ use std::result::Result as StdResult;
 use std::process::exit;
 use std::thread::spawn;
 use storage::{PersistDisk, PersistenceAdaptor};
-use zap_proxy::ZapProxy;
 use zdaemon::{Api, ConfigFile, Error as DError, Service, ZMsgExtended};
 
 fn main() {
@@ -83,7 +82,7 @@ fn start() -> Result<()> {
 
         let cert_cache = Rc::new(RefCell::new(CertCache::new(Some(persistence.dump().unwrap()))));
 
-        let (zap_publisher, zap_subscriber) = ZapProxy::new(&server_cert, config.update_port, cert_cache.clone()).unwrap();
+        let (zap_publisher, zap_subscriber) = zap_proxy::init(&server_cert, config.update_port, cert_cache.clone()).unwrap();
         service.add_endpoint(zap_publisher).unwrap();
         service.add_endpoint(zap_subscriber).unwrap();
 
