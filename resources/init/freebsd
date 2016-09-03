@@ -1,0 +1,26 @@
+#!/bin/sh
+
+. /etc/rc.subr
+
+name=inauth
+rcvar=inauth_enable
+load_rc_config $name
+
+command="/usr/local/bin/${name}"
+pidfile="/var/run/${name}.pid"
+required_files=/usr/local/etc/intecture/auth.json
+
+start_cmd=inauth_start
+stop_postcmd=inauth_cleanup
+
+inauth_start() {
+    echo "Starting inauth."
+    /usr/bin/touch ${pidfile}
+    /usr/sbin/daemon -cf -p ${pidfile} ${command}
+}
+
+inauth_cleanup() {
+    /bin/rm -f ${pidfile}
+}
+
+run_rc_command "$1"

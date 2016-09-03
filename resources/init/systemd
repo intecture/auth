@@ -1,0 +1,11 @@
+[Unit]
+Description=Auth component for Intecture infrastructure
+After=network.target
+
+[Service]
+Type=simple
+Environment=LD_LIBRARY_PATH=/usr/local/lib
+ExecStart=/usr/local/bin/inauth
+
+[Install]
+WantedBy=multi-user.target
