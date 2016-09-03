@@ -135,7 +135,7 @@ impl CertCache {
 #[cfg(test)]
 mod tests {
     use cert::{Cert, CertType};
-    use czmq::{ZCert, ZMsg, ZSock};
+    use czmq::{ZCert, ZMsg, ZSock, ZSys};
     use super::*;
 
     #[test]
@@ -156,6 +156,7 @@ mod tests {
 
     #[test]
     fn test_send() {
+        ZSys::init();
         let (cache, pubkey) = create_cache();
 
         let mut client = ZSock::new_push("inproc://cert_cache_send").unwrap();
@@ -179,6 +180,8 @@ mod tests {
 
     #[test]
     fn test_recv() {
+        ZSys::init();
+
         let mut cache = CertCache::new(None);
         let c1 = Cert::new("dan", CertType::User).unwrap();
         let c2 = Cert::new("web1.example.com", CertType::Host).unwrap();
