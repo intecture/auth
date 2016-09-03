@@ -40,9 +40,9 @@ impl ZapHandler {
         let zap = try!(ZSock::new_rep(ZAP_ENDPOINT));
         zap.set_linger(0);
 
-        let subscriber = ZSock::new(ZSockType::SUB);
+        let mut subscriber = ZSock::new(ZSockType::SUB);
         subscriber.set_curve_serverkey(auth_cert.public_txt());
-        cert.apply(&subscriber);
+        cert.apply(&mut subscriber);
         subscriber.set_linger(0);
         try!(subscriber.connect(&format!("tcp://{}:{}", auth_server, auth_port)));
         match cert_type {
@@ -101,31 +101,32 @@ impl Worker {
 
     fn run(&mut self) -> Result<()> {
         let mut poller = try!(ZPoller::new());
-        try!(poller.add(&self.zap));
-        try!(poller.add(&self.subscriber));
-        try!(poller.add(&self.comm));
+        try!(poller.add(&mut self.zap));
+        try!(poller.add(&mut self.subscriber));
+        try!(poller.add(&mut self.comm));
 
         loop {
             let sock: Option<ZSock> = poller.wait(None);
-            if let Some(sock) = sock {
+            if let Some(mut sock) = sock {
                 if sock == self.zap {
                     // These frames are system defined. We can safely
                     // unwrap them.
-                    let msg = ZMsg::expect_recv(&sock, 7, Some(7), false).unwrap();
-                    let request = try!(ZapRequest::new(
-                        self,
+                    let msg = ZMsg::expect_recv(&mut sock, 7, Some(7), false).unwrap();
+                    let mut request = try!(ZapRequest::new(
+                        &self.cache,
+                        &mut self.zap,
                         msg.popstr().unwrap().unwrap(),
                         msg.popstr().unwrap().unwrap(),
                         msg.popstr().unwrap().unwrap(),
                         msg.popstr().unwrap().unwrap(),
                         msg.popstr().unwrap().unwrap(),
                         msg.popstr().unwrap().unwrap(),
-                        z85_encode(&try!(msg.popbytes()).unwrap())));
+                        try!(z85_encode(&try!(msg.popbytes()).unwrap()))));
 
                     try!(request.authenticate());
                 }
                 else if sock == self.subscriber {
-                    try!(self.cache.recv(&sock));
+                    try!(self.cache.recv(&mut sock));
                 }
                 else if sock == self.comm && try!(self.comm.recv_str()).unwrap_or(String::new()) == THREAD_TERM {
                     break;
@@ -145,7 +146,8 @@ impl Worker {
 }
 
 struct ZapRequest<'a> {
-    worker: &'a Worker,
+    cache: &'a CertCache,
+    zap: &'a mut ZSock,
     _version: String,
     sequence: String,
     _domain: String,
@@ -156,14 +158,15 @@ struct ZapRequest<'a> {
 }
 
 impl<'a> ZapRequest<'a> {
-    fn new(worker: &'a Worker,
+    fn new(cache: &'a CertCache,
+           zap: &'a mut ZSock,
            version: String,
            sequence: String,
            domain: String,
            address: String,
            identity: String,
            mechanism: String,
-           client_pk: String) -> Result<ZapRequest> {
+           client_pk: String) -> Result<ZapRequest<'a>> {
 
         // This is hardcoded in ZMQ, so must always be
         // consistent, or we won't stick around.
@@ -177,7 +180,8 @@ impl<'a> ZapRequest<'a> {
         }
 
         Ok(ZapRequest {
-            worker: worker,
+            cache: cache,
+            zap: zap,
             _version: version,
             sequence: sequence,
             _domain: domain,
@@ -188,11 +192,12 @@ impl<'a> ZapRequest<'a> {
         })
     }
 
-    fn authenticate(&self) -> Result<()> {
+    fn authenticate(&mut self) -> Result<()> {
         match self.mechanism.as_ref() {
             "CURVE" => {
-                if let Some(cert) = self.worker.cache.get(&self.client_pk) {
-                    try!(self.zap_reply(true, Some(cert.encode_meta())));
+                let cert = self.cache.get(&self.client_pk);
+                if let Some(c) = cert {
+                    try!(self.zap_reply(true, Some(c.encode_meta())));
                     return Ok(());
                 }
             },
@@ -203,7 +208,7 @@ impl<'a> ZapRequest<'a> {
         Ok(())
     }
 
-    fn zap_reply(&self, ok: bool, metadata: Option<Vec<u8>>) -> Result<()> {
+    fn zap_reply(&mut self, ok: bool, metadata: Option<Vec<u8>>) -> Result<()> {
         let msg = ZMsg::new();
         try!(msg.addstr("1.0"));
         try!(msg.addstr(&self.sequence));
@@ -225,7 +230,7 @@ impl<'a> ZapRequest<'a> {
             None => try!(msg.addstr("")),
         }
 
-        try!(msg.send(&self.worker.zap));
+        try!(msg.send(self.zap));
         Ok(())
     }
 }
@@ -258,13 +263,13 @@ mod tests {
 
         let cert = Cert::new("jimbob", CertType::User).unwrap();
 
-        let zap = ZSock::new_req("inproc://zap_handler_test_zap").unwrap();
+        let mut zap = ZSock::new_req("inproc://zap_handler_test_zap").unwrap();
         zap.set_sndtimeo(Some(500));
         zap.set_rcvtimeo(Some(500));
 
         let zap_server = ZSock::new_rep("inproc://zap_handler_test_zap").unwrap();
 
-        let publisher = ZSock::new_pub("inproc://zap_handler_test_pub").unwrap();
+        let mut publisher = ZSock::new_pub("inproc://zap_handler_test_pub").unwrap();
         publisher.set_sndtimeo(Some(500));
 
         let subscriber = ZSock::new(ZSockType::SUB);
@@ -274,9 +279,9 @@ mod tests {
         let _handler = ZapHandler::run_worker(zap_server, subscriber, CertCache::new(None)).unwrap();
 
         let zap_msg = new_zap_msg(&cert);
-        zap_msg.send(&zap).unwrap();
+        zap_msg.send(&mut zap).unwrap();
 
-        let reply = ZMsg::recv(&zap).unwrap();
+        let reply = ZMsg::recv(&mut zap).unwrap();
         reply.popstr().unwrap().unwrap();
         reply.popstr().unwrap().unwrap();
         assert_eq!(reply.popstr().unwrap().unwrap(), "400");
@@ -287,13 +292,13 @@ mod tests {
         publish_msg.addstr("ADD").unwrap();
         publish_msg.addstr(cert.public_txt()).unwrap();
         publish_msg.addbytes(&cert.encode_meta()).unwrap();
-        publish_msg.send(&publisher).unwrap();
+        publish_msg.send(&mut publisher).unwrap();
 
         sleep(Duration::from_millis(200));
 
         let zap_msg = new_zap_msg(&cert);
-        zap_msg.send(&zap).unwrap();
-        let reply = ZMsg::recv(&zap).unwrap();
+        zap_msg.send(&mut zap).unwrap();
+        let reply = ZMsg::recv(&mut zap).unwrap();
         reply.popstr().unwrap().unwrap();
         reply.popstr().unwrap().unwrap();
         assert_eq!(reply.popstr().unwrap().unwrap(), "200");

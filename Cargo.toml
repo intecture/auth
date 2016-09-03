@@ -14,11 +14,13 @@ tempdir = "0.3.*"
 
 [dependencies]
 
+chan = "0.1"
+chan-signal = "0.1"
 czmq = { git = "https://github.com/petehayes102/rust-czmq.git", branch = "dev" }
 docopt = "0.6"
 rustc-serialize = "0.3.*"
 zdaemon = { git = "https://github.com/betweenlines/zdaemon.git", branch = "dev" }
-zmq = { git = "https://github.com/petehayes102/rust-zmq.git", branch = "tmp-master" }
+zmq = { git = "https://github.com/petehayes102/rust-zmq.git" }
 
 [lib]
 

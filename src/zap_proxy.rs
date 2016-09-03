@@ -16,50 +16,47 @@ use std::result::Result as StdResult;
 use std::str;
 use zdaemon::{Endpoint, Error as DError, ZMsgExtended};
 
-pub struct ZapProxy {
-    publisher: ZSock,
-    subscriber: ZSock,
-}
+pub struct ZapProxy;
 
 impl ZapProxy {
-    pub fn new(cert: &ZCert, update_port: u32) -> Result<ZapProxy> {
-        let xpub = ZSock::new(ZSockType::XPUB);
+    pub fn new(cert: &ZCert, update_port: u32, cert_cache: Rc<RefCell<CertCache>>) -> Result<(ZapPublisher, ZapSubscriber)> {
+        let mut xpub = ZSock::new(ZSockType::XPUB);
         xpub.set_xpub_verbose(true);
         xpub.set_zap_domain("auth.intecture");
         xpub.set_curve_server(true);
-        cert.apply(&xpub);
+        cert.apply(&mut xpub);
         try!(xpub.bind(&format!("tcp://*:{}", update_port)));
+        let xpub_share = Rc::new(xpub);
 
         let xsub = try!(ZSock::new_xsub("inproc://auth_publisher"));
+        let xsub_share = Rc::new(xsub);
 
-        Ok(ZapProxy {
-            publisher: xpub,
-            subscriber: xsub,
-        })
+        Ok((ZapPublisher {
+            publisher: xpub_share.clone(),
+            subscriber: xsub_share.clone(),
+            cache: cert_cache.clone(),
+        },
+        ZapSubscriber {
+            publisher: xpub_share,
+            subscriber: xsub_share,
+            cache: cert_cache,
+        }))
     }
 }
 
 pub struct ZapPublisher {
-    proxy: Rc<ZapProxy>,
+    publisher: Rc<ZSock>,
+    subscriber: Rc<ZSock>,
     cache: Rc<RefCell<CertCache>>,
 }
 
-impl ZapPublisher {
-    pub fn new(proxy: Rc<ZapProxy>, cache: Rc<RefCell<CertCache>>) -> ZapPublisher {
-        ZapPublisher {
-            proxy: proxy,
-            cache: cache,
-        }
-    }
-}
-
 impl Endpoint for ZapPublisher {
-    fn get_sockets(&self) -> Vec<&ZSock> {
-        vec![&self.proxy.publisher]
+    fn get_sockets(&mut self) -> Vec<&mut ZSock> {
+        vec![Rc::get_mut(&mut self.publisher).unwrap()]
     }
 
-    fn recv(&mut self, _: &ZSock) -> StdResult<(), DError> {
-        let frame = try!(ZFrame::recv(&self.proxy.publisher));
+    fn recv(&mut self, _: &mut ZSock) -> StdResult<(), DError> {
+        let frame = try!(ZFrame::recv(Rc::get_mut(&mut self.publisher).unwrap()));
 
         let bytes = match try!(frame.data()) {
             Ok(s) => s.into_bytes(),
@@ -75,46 +72,38 @@ impl Endpoint for ZapPublisher {
                     let topic = try!(str::from_utf8(&topic_bytes));
                     Some(try!(CertType::from_str(topic)))
                 };
-                try!(self.cache.borrow().send(&self.proxy.publisher, cert_type));
+                try!(self.cache.borrow().send(Rc::get_mut(&mut self.publisher).unwrap(), cert_type));
             }
         }
 
         // Receive any unreceived frames
-        let msg = try!(ZMsg::expect_recv(&self.proxy.publisher, 0, None, false));
+        let msg = try!(ZMsg::expect_recv(Rc::get_mut(&mut self.publisher).unwrap(), 0, None, false));
         try!(msg.prepend(frame));
 
         // Pass subscription frame to publishers
-        try!(msg.send(&self.proxy.subscriber));
+        try!(msg.send(Rc::get_mut(&mut self.subscriber).unwrap()));
 
         Ok(())
     }
 }
 
 pub struct ZapSubscriber {
-    proxy: Rc<ZapProxy>,
+    publisher: Rc<ZSock>,
+    subscriber: Rc<ZSock>,
     cache: Rc<RefCell<CertCache>>,
 }
 
-impl ZapSubscriber {
-    pub fn new(proxy: Rc<ZapProxy>, cache: Rc<RefCell<CertCache>>) -> ZapSubscriber {
-        ZapSubscriber {
-            proxy: proxy,
-            cache: cache,
-        }
-    }
-}
-
 impl Endpoint for ZapSubscriber {
-    fn get_sockets(&self) -> Vec<&ZSock> {
-        vec![&self.proxy.subscriber]
+    fn get_sockets(&mut self) -> Vec<&mut ZSock> {
+        vec![Rc::get_mut(&mut self.subscriber).unwrap()]
     }
 
-    fn recv(&mut self, _: &ZSock) -> StdResult<(), DError> {
+    fn recv(&mut self, _: &mut ZSock) -> StdResult<(), DError> {
         // Cache certificate
-        let msg = try!(self.cache.borrow_mut().recv(&self.proxy.subscriber));
+        let msg = try!(self.cache.borrow_mut().recv(Rc::get_mut(&mut self.subscriber).unwrap()));
 
         // Forward message to subscriber (XPUB)
-        try!(msg.send(&self.proxy.publisher));
+        try!(msg.send(Rc::get_mut(&mut self.publisher).unwrap()));
 
         Ok(())
     }
@@ -150,34 +139,35 @@ mod tests {
         let xpub = ZSock::new_xpub("inproc://zap_proxy_test_publisher").unwrap();
         xpub.set_sndtimeo(Some(500));
         xpub.set_rcvtimeo(Some(500));
+        let xpub_share = Rc::new(xpub);
         let xsub = ZSock::new(ZSockType::XSUB);
+        let xsub_share = Rc::new(xsub);
 
-        let proxy = Rc::new(ZapProxy {
-            publisher: xpub,
-            subscriber: xsub,
-        });
+        let mut fake = ZSock::new(ZSockType::REP);
 
-        let fake = ZSock::new(ZSockType::REP);
+        let mut publisher = ZapPublisher {
+            publisher: xpub_share,
+            subscriber: xsub_share,
+            cache: Rc::new(RefCell::new(cache))
+        };
 
-        let mut publisher = ZapPublisher::new(proxy, Rc::new(RefCell::new(cache)));
-
-        let client = ZSock::new_sub("inproc://zap_proxy_test_publisher", Some("user")).unwrap();
+        let mut client = ZSock::new_sub("inproc://zap_proxy_test_publisher", Some("user")).unwrap();
         client.set_rcvtimeo(Some(500));
 
-        publisher.recv(&fake).unwrap();
-        let msg = ZMsg::recv(&client).unwrap();
+        publisher.recv(&mut fake).unwrap();
+        let msg = ZMsg::recv(&mut client).unwrap();
         msg.popstr().unwrap().unwrap(); // Discard topic
         assert_eq!(msg.popstr().unwrap().unwrap(), "ADD");
         assert_eq!(msg.popstr().unwrap().unwrap(), user_pubkey);
         assert_eq!(msg.popbytes().unwrap().unwrap(), user_meta);
 
         client.set_unsubscribe("user");
-        publisher.recv(&fake).unwrap();
+        publisher.recv(&mut fake).unwrap();
         assert!(client.recv_str().is_err());
 
         client.set_subscribe("");
-        publisher.recv(&fake).unwrap();
-        let msg = ZMsg::recv(&client).unwrap();
+        publisher.recv(&mut fake).unwrap();
+        let msg = ZMsg::recv(&mut client).unwrap();
         msg.popstr().unwrap().unwrap(); // Discard topic
         assert_eq!(msg.popstr().unwrap().unwrap(), "ADD");
 
@@ -205,32 +195,33 @@ mod tests {
         let cache = CertCache::new(None);
 
         let xpub = ZSock::new(ZSockType::XPUB);
+        let xpub_share = Rc::new(xpub);
         let xsub = ZSock::new_xsub("@inproc://zap_proxy_test_subscriber").unwrap();
         xsub.set_rcvtimeo(Some(500));
+        let xsub_share = Rc::new(xsub);
 
-        let fake = ZSock::new(ZSockType::REP);
+        let mut fake = ZSock::new(ZSockType::REP);
 
-        let proxy = Rc::new(ZapProxy {
-            publisher: xpub,
-            subscriber: xsub,
-        });
+        let mut subscriber = ZapSubscriber {
+            publisher: xpub_share,
+            subscriber: xsub_share,
+            cache: Rc::new(RefCell::new(cache))
+        };
 
-        let mut subscriber = ZapSubscriber::new(proxy, Rc::new(RefCell::new(cache)));
-
-        let server = ZSock::new_pub(">inproc://zap_proxy_test_subscriber").unwrap();
+        let mut server = ZSock::new_pub(">inproc://zap_proxy_test_subscriber").unwrap();
         server.set_sndtimeo(Some(500));
 
         let subscribe_frame = ZFrame::new(&[1]).unwrap();
-        subscribe_frame.send(&subscriber.proxy.subscriber, None).unwrap();
+        subscribe_frame.send(Rc::get_mut(&mut subscriber.subscriber).unwrap(), None).unwrap();
 
         let msg = ZMsg::new();
         msg.addstr("user").unwrap();
         msg.addstr("ADD").unwrap();
         msg.addstr(&user_pubkey).unwrap();
         msg.addbytes(&user_meta).unwrap();
-        msg.send(&server).unwrap();
+        msg.send(&mut server).unwrap();
 
-        subscriber.recv(&fake).unwrap();
+        subscriber.recv(&mut fake).unwrap();
         assert!(subscriber.cache.borrow().get(&user_pubkey).is_some());
 
         let msg = ZMsg::new();
@@ -238,9 +229,9 @@ mod tests {
         msg.addstr("ADD").unwrap();
         msg.addstr(&host_pubkey).unwrap();
         msg.addbytes(&host_meta).unwrap();
-        msg.send(&server).unwrap();
+        msg.send(&mut server).unwrap();
 
-        subscriber.recv(&fake).unwrap();
+        subscriber.recv(&mut fake).unwrap();
         assert!(subscriber.cache.borrow().get(&host_pubkey).is_some());
     }
 }

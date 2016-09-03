@@ -50,21 +50,21 @@ mod tests {
     fn test_new() {
         ZSys::init();
 
-        let zap = ZSock::new_rep("inproc://zeromq.zap.01").unwrap();
+        let mut zap = ZSock::new_rep("inproc://zeromq.zap.01").unwrap();
 
-        let server = ZSock::new(ZSockType::REP);
+        let mut server = ZSock::new(ZSockType::REP);
         server.set_zap_domain("test");
         server.set_curve_server(true);
         let server_cert = ZCert::new().unwrap();
-        server_cert.apply(&server);
+        server_cert.apply(&mut server);
         let port = server.bind("tcp://127.0.0.1:*[60000-]").unwrap();
 
-        let client = ZSock::new(ZSockType::REQ);
+        let mut client = ZSock::new(ZSockType::REQ);
         client.set_curve_serverkey(server_cert.public_txt());
         let client_cert = ZCert::new().unwrap();
         client_cert.set_meta("name", "ben.dover");
         client_cert.set_meta("type", "user");
-        client_cert.apply(&client);
+        client_cert.apply(&mut client);
         client.connect(&format!("tcp://127.0.0.1:{}", port)).unwrap();
 
         // Discard ZAP request
@@ -77,10 +77,10 @@ mod tests {
         msg.addstr("OK").unwrap();
         msg.addstr("").unwrap(); // User ID
         msg.addbytes(&client_cert.encode_meta()).unwrap();
-        msg.send(&zap).unwrap();
+        msg.send(&mut zap).unwrap();
 
         client.send_str("test").unwrap();
-        let frame = ZFrame::recv(&server).unwrap();
+        let frame = ZFrame::recv(&mut server).unwrap();
         assert!(RequestMeta::new(&frame).is_ok());
     }
 }

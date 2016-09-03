@@ -61,7 +61,7 @@ impl CertCache {
         dump
     }
 
-    pub fn send(&self, sock: &ZSock, topic: Option<CertType>) -> Result<()> {
+    pub fn send(&self, sock: &mut ZSock, topic: Option<CertType>) -> Result<()> {
         let msg = ZMsg::new();
         match topic {
             Some(cert_type) => try!(msg.addstr(cert_type.to_str())),
@@ -83,7 +83,7 @@ impl CertCache {
         Ok(())
     }
 
-    pub fn recv(&mut self, sock: &ZSock) -> Result<ZMsg> {
+    pub fn recv(&mut self, sock: &mut ZSock) -> Result<ZMsg> {
         let msg = try!(ZMsg::recv(sock));
 
         // Remove topic frame
@@ -108,7 +108,7 @@ impl CertCache {
                             Err(b) => b,
                         };
 
-                        let zcert = ZCert::from_txt(&pubkey, "0000000000000000000000000000000000000000");
+                        let zcert = try!(ZCert::from_txt(&pubkey, "0000000000000000000000000000000000000000"));
                         try!(zcert.decode_meta(&meta));
 
                         self.cache.insert(zcert.public_txt().to_string(), try!(Cert::from_zcert(zcert)));
@@ -158,15 +158,15 @@ mod tests {
     fn test_send() {
         let (cache, pubkey) = create_cache();
 
-        let client = ZSock::new_push("inproc://cert_cache_send").unwrap();
-        let server = ZSock::new_pull("inproc://cert_cache_send").unwrap();
+        let mut client = ZSock::new_push("inproc://cert_cache_send").unwrap();
+        let mut server = ZSock::new_pull("inproc://cert_cache_send").unwrap();
         server.set_rcvtimeo(Some(500));
 
-        cache.send(&client, Some(CertType::Host)).unwrap();
+        cache.send(&mut client, Some(CertType::Host)).unwrap();
         assert!(server.recv_str().is_err());
 
-        cache.send(&client, Some(CertType::User)).unwrap();
-        let msg = ZMsg::recv(&server).unwrap();
+        cache.send(&mut client, Some(CertType::User)).unwrap();
+        let msg = ZMsg::recv(&mut server).unwrap();
         msg.popstr().unwrap().unwrap(); // Discard topic
         assert_eq!(msg.popstr().unwrap().unwrap(), "ADD");
         assert_eq!(msg.popstr().unwrap().unwrap(), pubkey);
@@ -183,11 +183,11 @@ mod tests {
         let c1 = Cert::new("dan", CertType::User).unwrap();
         let c2 = Cert::new("web1.example.com", CertType::Host).unwrap();
 
-        let client = ZSock::new_push("inproc://cert_cache_recv").unwrap();
-        let server = ZSock::new_pull("inproc://cert_cache_recv").unwrap();
+        let mut client = ZSock::new_push("inproc://cert_cache_recv").unwrap();
+        let mut server = ZSock::new_pull("inproc://cert_cache_recv").unwrap();
         server.set_rcvtimeo(Some(500));
 
-        assert!(cache.recv(&server).is_err());
+        assert!(cache.recv(&mut server).is_err());
 
         let msg = ZMsg::new();
         msg.addstr("topic").unwrap();
@@ -196,9 +196,9 @@ mod tests {
         msg.addbytes(&c1.encode_meta()).unwrap();
         msg.addstr(c2.public_txt()).unwrap();
         msg.addbytes(&c2.encode_meta()).unwrap();
-        msg.send(&client).unwrap();
+        msg.send(&mut client).unwrap();
 
-        assert!(cache.recv(&server).is_ok());
+        assert!(cache.recv(&mut server).is_ok());
         assert!(cache.cache.contains_key(c1.public_txt()));
         assert!(cache.cache.contains_key(c2.public_txt()));
 
@@ -206,9 +206,9 @@ mod tests {
         msg.addstr("topic").unwrap();
         msg.addstr("DEL").unwrap();
         msg.addstr(c1.public_txt()).unwrap();
-        msg.send(&client).unwrap();
+        msg.send(&mut client).unwrap();
 
-        assert!(cache.recv(&server).is_ok());
+        assert!(cache.recv(&mut server).is_ok());
         assert!(!cache.cache.contains_key(c1.public_txt()));
     }
 

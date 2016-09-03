@@ -31,7 +31,7 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
         })
     }
 
-    pub fn list(&mut self, sock: &ZSock) -> Result<()> {
+    pub fn list(&mut self, sock: &mut ZSock) -> Result<()> {
         let msg = try!(ZMsg::expect_recv(sock, 1, Some(1), false));
         let cert_type = match msg.popstr().unwrap() {
             Ok(str) => str,
@@ -46,7 +46,7 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
         Ok(())
     }
 
-    pub fn lookup(&mut self, sock: &ZSock) -> Result<()> {
+    pub fn lookup(&mut self, sock: &mut ZSock) -> Result<()> {
         let msg = try!(ZMsg::expect_recv(sock, 1, Some(1), false));
         let name = match msg.popstr().unwrap() {
             Ok(str) => str,
@@ -64,7 +64,7 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
         }
     }
 
-    pub fn create(&mut self, sock: &ZSock, endpoint_frame: ZFrame) -> Result<()> {
+    pub fn create(&mut self, sock: &mut ZSock, endpoint_frame: ZFrame) -> Result<()> {
         // Only users can create certificates
         let meta = try!(RequestMeta::new(&endpoint_frame));
         if meta.cert_type != CertType::User {
@@ -75,7 +75,7 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
     }
 
     // Allow testing without auth
-    fn do_create(&mut self, sock: &ZSock) -> Result<()> {
+    fn do_create(&mut self, sock: &mut ZSock) -> Result<()> {
         let request = try!(ZMsg::expect_recv(sock, 2, Some(2), false));
 
         let cert_type = match request.popstr().unwrap() {
@@ -97,7 +97,7 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
         try!(msg.addstr("ADD"));
         try!(msg.addstr(cert.public_txt()));
         try!(msg.addbytes(&cert.encode_meta()));
-        try!(msg.send(&self.publisher));
+        try!(msg.send(&mut self.publisher));
 
         // Reply cert
         let msg = try!(ZMsg::new_ok());
@@ -109,7 +109,7 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
         Ok(())
     }
 
-    pub fn delete(&mut self, sock: &ZSock, endpoint_frame: ZFrame) -> Result<()> {
+    pub fn delete(&mut self, sock: &mut ZSock, endpoint_frame: ZFrame) -> Result<()> {
         // Only users can delete certificates
         let meta = try!(RequestMeta::new(&endpoint_frame));
         if meta.cert_type != CertType::User {
@@ -120,7 +120,7 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
     }
 
     // Allow testing without auth
-    fn do_delete(&mut self, sock: &ZSock) -> Result<()> {
+    fn do_delete(&mut self, sock: &mut ZSock) -> Result<()> {
         let request = try!(ZMsg::expect_recv(sock, 1, Some(1), false));
         let name: String = match request.popstr().unwrap() {
             Ok(n) => n,
@@ -132,7 +132,7 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
         try!(self.persistence.delete(&name));
 
         let msg = ZMsg::new();
-        try!(msg.send_multi(&self.publisher, &[
+        try!(msg.send_multi(&mut self.publisher, &[
             cert.cert_type().to_str(),
             "DEL",
             &cert.public_txt(),
@@ -164,19 +164,19 @@ mod tests {
         let user = Cert::new("luke_vader", CertType::User).unwrap();
         let (_dir, mut api) = create_api(">inproc://api_test_list_publisher", Some(vec![&host, &user]));
 
-        let (client, server) = ZSys::create_pipe().unwrap();
+        let (mut client, mut server) = ZSys::create_pipe().unwrap();
 
         client.send_str("user").unwrap();
-        api.list(&server).unwrap();
+        api.list(&mut server).unwrap();
 
-        let reply = ZMsg::recv(&client).unwrap();
+        let reply = ZMsg::recv(&mut client).unwrap();
         assert_eq!(reply.popstr().unwrap().unwrap(), "Ok");
         assert_eq!(reply.popstr().unwrap().unwrap(), "luke_vader");
 
         client.send_str("host").unwrap();
-        api.list(&server).unwrap();
+        api.list(&mut server).unwrap();
 
-        let reply = ZMsg::recv(&client).unwrap();
+        let reply = ZMsg::recv(&mut client).unwrap();
         assert_eq!(reply.popstr().unwrap().unwrap(), "Ok");
         assert_eq!(reply.popstr().unwrap().unwrap(), "luke.jedi.org");
     }
@@ -188,18 +188,18 @@ mod tests {
         let cert = Cert::new("r2d2", CertType::Host).unwrap();
         let (_dir, mut api) = create_api(">inproc://api_test_lookup_publisher", Some(vec![&cert]));
 
-        let client = ZSock::new_req("inproc://api_test_lookup").unwrap();
-        let server = ZSock::new_rep("inproc://api_test_lookup").unwrap();
+        let mut client = ZSock::new_req("inproc://api_test_lookup").unwrap();
+        let mut server = ZSock::new_rep("inproc://api_test_lookup").unwrap();
 
         client.send_str("Han Solo").unwrap();
-        assert!(api.lookup(&server).is_err());
+        assert!(api.lookup(&mut server).is_err());
         server.send_str("").unwrap();
         client.recv_str().unwrap().unwrap();
 
         client.send_str("r2d2").unwrap();
-        assert!(api.lookup(&server).is_ok());
+        assert!(api.lookup(&mut server).is_ok());
 
-        let reply = ZMsg::recv(&client).unwrap();
+        let reply = ZMsg::recv(&mut client).unwrap();
         assert_eq!(reply.popstr().unwrap().unwrap(), "Ok");
         assert_eq!(reply.popstr().unwrap().unwrap(), cert.public_txt());
     }
@@ -210,20 +210,20 @@ mod tests {
 
         let (_dir, mut api) = create_api(">inproc://api_test_create_publisher", None);
 
-        let subscriber = ZSock::new_sub("@inproc://api_test_create_publisher", Some("host")).unwrap();
-        let client = ZSock::new_req("inproc://api_test_create").unwrap();
-        let server = ZSock::new_rep("inproc://api_test_create").unwrap();
+        let mut subscriber = ZSock::new_sub("@inproc://api_test_create_publisher", Some("host")).unwrap();
+        let mut client = ZSock::new_req("inproc://api_test_create").unwrap();
+        let mut server = ZSock::new_rep("inproc://api_test_create").unwrap();
 
         let msg = ZMsg::new();
-        msg.send_multi(&client, &["host", "usetheforks.com"]).unwrap();
-        assert!(api.do_create(&server).is_ok());
+        msg.send_multi(&mut client, &["host", "usetheforks.com"]).unwrap();
+        assert!(api.do_create(&mut server).is_ok());
 
-        let reply = ZMsg::recv(&client).unwrap();
+        let reply = ZMsg::recv(&mut client).unwrap();
         assert_eq!(reply.size(), 4);
         assert_eq!(reply.popstr().unwrap().unwrap(), "Ok");
         let pubkey = reply.popstr().unwrap().unwrap();
 
-        let sub_reply = ZMsg::recv(&subscriber).unwrap();
+        let sub_reply = ZMsg::recv(&mut subscriber).unwrap();
         sub_reply.popstr().unwrap().unwrap(); // Remove topic frame
         assert_eq!(sub_reply.popstr().unwrap().unwrap(), "ADD");
         assert_eq!(sub_reply.popstr().unwrap().unwrap(), pubkey);
@@ -236,22 +236,22 @@ mod tests {
         let cert = Cert::new("c3po", CertType::Host).unwrap();
         let (_dir, mut api) = create_api(">inproc://api_test_delete_publisher", Some(vec![&cert]));
 
-        let subscriber = ZSock::new_sub("@inproc://api_test_delete_publisher", Some("host")).unwrap();
-        let client = ZSock::new_req("inproc://api_test_delete").unwrap();
-        let server = ZSock::new_rep("inproc://api_test_delete").unwrap();
+        let mut subscriber = ZSock::new_sub("@inproc://api_test_delete_publisher", Some("host")).unwrap();
+        let mut client = ZSock::new_req("inproc://api_test_delete").unwrap();
+        let mut server = ZSock::new_rep("inproc://api_test_delete").unwrap();
 
         client.send_str("Han Solo's Millenium Falcon Ignition Key").unwrap();
-        assert!(api.do_delete(&server).is_err());
+        assert!(api.do_delete(&mut server).is_err());
         server.send_str("").unwrap();
         client.recv_str().unwrap().unwrap();
 
         client.send_str("c3po").unwrap();
-        assert!(api.do_delete(&server).is_ok());
+        assert!(api.do_delete(&mut server).is_ok());
 
-        let reply = ZMsg::recv(&client).unwrap();
+        let reply = ZMsg::recv(&mut client).unwrap();
         assert_eq!(reply.popstr().unwrap().unwrap(), "Ok");
 
-        let sub_reply = ZMsg::recv(&subscriber).unwrap();
+        let sub_reply = ZMsg::recv(&mut subscriber).unwrap();
         sub_reply.popstr().unwrap().unwrap(); // Remove topic frame
         assert_eq!(sub_reply.popstr().unwrap().unwrap(), "DEL");
         assert_eq!(sub_reply.popstr().unwrap().unwrap(), cert.public_txt());

@@ -32,6 +32,7 @@ pub enum Error {
     PollerTimeout,
     ZapVersion,
     ZDaemon(zdaemon::Error),
+    ZmqEncode(String),
 }
 
 impl fmt::Display for Error {
@@ -54,6 +55,7 @@ impl fmt::Display for Error {
             Error::PollerTimeout => write!(f, "Timeout while polling sockets"),
             Error::ZapVersion => write!(f, "ZAP version is invalid"),
             Error::ZDaemon(ref e) => write!(f, "ZDaemon error: {}", e),
+            Error::ZmqEncode(ref e) => write!(f, "Could not encode Z85 string: {}", e),
         }
     }
 }
@@ -78,6 +80,7 @@ impl error::Error for Error {
             Error::PollerTimeout => "Timeout while polling sockets",
             Error::ZapVersion => "ZAP version is invalid",
             Error::ZDaemon(ref e) => e.description(),
+            Error::ZmqEncode(_) => "Could not encode Z85 string",
         }
     }
 }
