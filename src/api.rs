@@ -26,28 +26,28 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
     pub fn new(persistence: P, cert_cache: Rc<RefCell<CertCache>>) -> Result<CertApi<P>> {
         Ok(CertApi {
             persistence: persistence,
-            publisher: try!(ZSock::new_pub("inproc://auth_publisher")),
+            publisher: ZSock::new_pub("inproc://auth_publisher")?,
             cert_cache: cert_cache,
         })
     }
 
-    pub fn list(&mut self, sock: &mut ZSock) -> Result<()> {
-        let msg = try!(ZMsg::expect_recv(sock, 1, Some(1), false));
+    pub fn list(&mut self, sock: &mut ZSock, router_id: &[u8]) -> Result<()> {
+        let msg = ZMsg::expect_recv(sock, 1, Some(1), false)?;
         let cert_type = match msg.popstr().unwrap() {
             Ok(str) => str,
             Err(_) => return Err(Error::InvalidArg),
         };
 
-        let reply = try!(ZMsg::new_ok());
-        for cert in self.cert_cache.borrow().dump(try!(CertType::from_str(&cert_type))) {
-            try!(reply.addstr(cert.name()));
+        let reply = ZMsg::new_ok(Some(router_id))?;
+        for cert in self.cert_cache.borrow().dump(CertType::from_str(&cert_type)?) {
+            reply.addstr(cert.name())?;
         }
-        try!(reply.send(sock));
+        reply.send(sock)?;
         Ok(())
     }
 
-    pub fn lookup(&mut self, sock: &mut ZSock) -> Result<()> {
-        let msg = try!(ZMsg::expect_recv(sock, 1, Some(1), false));
+    pub fn lookup(&mut self, sock: &mut ZSock, router_id: &[u8]) -> Result<()> {
+        let msg = ZMsg::expect_recv(sock, 1, Some(1), false)?;
         let name = match msg.popstr().unwrap() {
             Ok(str) => str,
             Err(_) => return Err(Error::InvalidArg),
@@ -55,31 +55,31 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
 
         match self.cert_cache.borrow().get_name(&name) {
             Some(cert) => {
-                let reply = try!(ZMsg::new_ok());
-                try!(reply.addstr(cert.public_txt()));
-                try!(reply.send(sock));
+                let reply = ZMsg::new_ok(Some(router_id))?;
+                reply.addstr(cert.public_txt())?;
+                reply.send(sock)?;
                 Ok(())
             },
             None => Err(Error::InvalidCert),
         }
     }
 
-    pub fn create(&mut self, sock: &mut ZSock, endpoint_frame: ZFrame) -> Result<()> {
+    pub fn create(&mut self, sock: &mut ZSock, endpoint_frame: ZFrame, router_id: &[u8]) -> Result<()> {
         // Only users can create certificates
-        let meta = try!(RequestMeta::new(&endpoint_frame));
+        let meta = RequestMeta::new(&endpoint_frame)?;
         if meta.cert_type != CertType::User {
             return Err(Error::Forbidden);
         }
 
-        self.do_create(sock)
+        self.do_create(sock, router_id)
     }
 
     // Allow testing without auth
-    fn do_create(&mut self, sock: &mut ZSock) -> Result<()> {
-        let request = try!(ZMsg::expect_recv(sock, 2, Some(2), false));
+    fn do_create(&mut self, sock: &mut ZSock, router_id: &[u8]) -> Result<()> {
+        let request = ZMsg::expect_recv(sock, 2, Some(2), false)?;
 
         let cert_type = match request.popstr().unwrap() {
-            Ok(t) => try!(CertType::from_str(&t)),
+            Ok(t) => CertType::from_str(&t)?,
             Err(_) => return Err(Error::InvalidCertMeta),
         };
 
@@ -88,57 +88,58 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
             Err(_) => return Err(Error::InvalidCertMeta),
         };
 
-        let cert = try!(Cert::new(&cert_name, cert_type));
-        try!(self.persistence.create(&cert));
+        let cert = Cert::new(&cert_name, cert_type)?;
+        self.persistence.create(&cert)?;
 
         // Publish cert
         let msg = ZMsg::new();
-        try!(msg.addstr(cert.cert_type().to_str()));
-        try!(msg.addstr("ADD"));
-        try!(msg.addstr(cert.public_txt()));
-        try!(msg.addbytes(&cert.encode_meta()));
-        try!(msg.send(&mut self.publisher));
+        msg.addstr(cert.cert_type().to_str())?;
+        msg.addstr("ADD")?;
+        msg.addstr(cert.public_txt())?;
+        msg.addbytes(&cert.encode_meta())?;
+        msg.send(&mut self.publisher)?;
 
         // Reply cert
-        let msg = try!(ZMsg::new_ok());
-        try!(msg.addstr(cert.public_txt()));
-        try!(msg.addstr(cert.secret_txt()));
-        try!(msg.addbytes(&cert.encode_meta()));
-        try!(msg.send(sock));
+        let msg = ZMsg::new_ok(Some(router_id))?;
+        msg.addstr(cert.public_txt())?;
+        msg.addstr(cert.secret_txt())?;
+        msg.addbytes(&cert.encode_meta())?;
+        msg.send(sock)?;
 
         Ok(())
     }
 
-    pub fn delete(&mut self, sock: &mut ZSock, endpoint_frame: ZFrame) -> Result<()> {
+    pub fn delete(&mut self, sock: &mut ZSock, endpoint_frame: ZFrame, router_id: &[u8]) -> Result<()> {
         // Only users can delete certificates
-        let meta = try!(RequestMeta::new(&endpoint_frame));
+        let meta = RequestMeta::new(&endpoint_frame)?;
         if meta.cert_type != CertType::User {
             return Err(Error::Forbidden);
         }
 
-        self.do_delete(sock)
+        self.do_delete(sock, router_id)
     }
 
     // Allow testing without auth
-    fn do_delete(&mut self, sock: &mut ZSock) -> Result<()> {
-        let request = try!(ZMsg::expect_recv(sock, 1, Some(1), false));
+    fn do_delete(&mut self, sock: &mut ZSock, router_id: &[u8]) -> Result<()> {
+        let request = ZMsg::expect_recv(sock, 1, Some(1), false)?;
         let name: String = match request.popstr().unwrap() {
             Ok(n) => n,
             Err(_) => return Err(Error::InvalidCert),
         };
 
-        let cert = try!(self.persistence.read(&name));
+        let cert = self.persistence.read(&name)?;
 
-        try!(self.persistence.delete(&name));
+        self.persistence.delete(&name)?;
 
         let msg = ZMsg::new();
-        try!(msg.send_multi(&mut self.publisher, &[
+        msg.send_multi(&mut self.publisher, &[
             cert.cert_type().to_str(),
             "DEL",
             &cert.public_txt(),
-        ]));
+        ])?;
 
-        try!(sock.send_str("Ok"));
+        let msg = ZMsg::new_ok(Some(router_id))?;
+        msg.send(sock)?;
 
         Ok(())
     }
@@ -167,16 +168,18 @@ mod tests {
         let (mut client, mut server) = ZSys::create_pipe().unwrap();
 
         client.send_str("user").unwrap();
-        api.list(&mut server).unwrap();
+        api.list(&mut server, b"router_id").unwrap();
 
         let reply = ZMsg::recv(&mut client).unwrap();
+        assert_eq!(reply.popstr().unwrap().unwrap(), "router_id");
         assert_eq!(reply.popstr().unwrap().unwrap(), "Ok");
         assert_eq!(reply.popstr().unwrap().unwrap(), "luke_vader");
 
         client.send_str("host").unwrap();
-        api.list(&mut server).unwrap();
+        api.list(&mut server, b"router_id").unwrap();
 
         let reply = ZMsg::recv(&mut client).unwrap();
+        assert_eq!(reply.popstr().unwrap().unwrap(), "router_id");
         assert_eq!(reply.popstr().unwrap().unwrap(), "Ok");
         assert_eq!(reply.popstr().unwrap().unwrap(), "luke.jedi.org");
     }
@@ -192,14 +195,15 @@ mod tests {
         let mut server = ZSock::new_rep("inproc://api_test_lookup").unwrap();
 
         client.send_str("Han Solo").unwrap();
-        assert!(api.lookup(&mut server).is_err());
+        assert!(api.lookup(&mut server, b"router_id").is_err());
         server.send_str("").unwrap();
         client.recv_str().unwrap().unwrap();
 
         client.send_str("r2d2").unwrap();
-        assert!(api.lookup(&mut server).is_ok());
+        assert!(api.lookup(&mut server, b"router_id").is_ok());
 
         let reply = ZMsg::recv(&mut client).unwrap();
+        assert_eq!(reply.popstr().unwrap().unwrap(), "router_id");
         assert_eq!(reply.popstr().unwrap().unwrap(), "Ok");
         assert_eq!(reply.popstr().unwrap().unwrap(), cert.public_txt());
     }
@@ -216,10 +220,11 @@ mod tests {
 
         let msg = ZMsg::new();
         msg.send_multi(&mut client, &["host", "usetheforks.com"]).unwrap();
-        assert!(api.do_create(&mut server).is_ok());
+        api.do_create(&mut server, b"router_id").unwrap();
 
         let reply = ZMsg::recv(&mut client).unwrap();
-        assert_eq!(reply.size(), 4);
+        assert_eq!(reply.size(), 5);
+        assert_eq!(reply.popstr().unwrap().unwrap(), "router_id");
         assert_eq!(reply.popstr().unwrap().unwrap(), "Ok");
         let pubkey = reply.popstr().unwrap().unwrap();
 
@@ -241,14 +246,15 @@ mod tests {
         let mut server = ZSock::new_rep("inproc://api_test_delete").unwrap();
 
         client.send_str("Han Solo's Millenium Falcon Ignition Key").unwrap();
-        assert!(api.do_delete(&mut server).is_err());
+        assert!(api.do_delete(&mut server, b"router_id").is_err());
         server.send_str("").unwrap();
         client.recv_str().unwrap().unwrap();
 
         client.send_str("c3po").unwrap();
-        assert!(api.do_delete(&mut server).is_ok());
+        assert!(api.do_delete(&mut server, b"router_id").is_ok());
 
         let reply = ZMsg::recv(&mut client).unwrap();
+        assert_eq!(reply.popstr().unwrap().unwrap(), "router_id");
         assert_eq!(reply.popstr().unwrap().unwrap(), "Ok");
 
         let sub_reply = ZMsg::recv(&mut subscriber).unwrap();

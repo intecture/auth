@@ -50,30 +50,30 @@ fn main() {
 
 fn start() -> Result<()> {
     let signal = chan_signal::notify(&[Signal::INT, Signal::TERM]);
-    let (parent, child) = try!(ZSys::create_pipe());
+    let (parent, child) = ZSys::create_pipe()?;
 
-    let config = try!(Config::search("intecture/auth.json", None));
+    let config = Config::search("intecture/auth.json", None)?;
 
     // Create new server cert if missing
     let server_cert = match metadata(&config.server_cert) {
-        Ok(_) => try!(ZCert::load(&config.server_cert)),
+        Ok(_) => ZCert::load(&config.server_cert)?,
         Err(_) => {
-            let c = try!(ZCert::new());
+            let c = ZCert::new()?;
             c.set_meta("name", "auth");
             c.set_meta("type", CertType::Host.to_str());
-            try!(c.save_public(&format!("{}_public", &config.server_cert)));
-            try!(c.save_secret(&config.server_cert));
+            c.save_public(&format!("{}_public", &config.server_cert))?;
+            c.save_secret(&config.server_cert)?;
             c
         }
     };
 
-    let mut persistence = try!(PersistDisk::new(&config.cert_path));
+    let mut persistence = PersistDisk::new(&config.cert_path)?;
 
-    let mut api_sock = ZSock::new(SocketType::REP);
+    let mut api_sock = ZSock::new(SocketType::ROUTER);
     api_sock.set_zap_domain("auth.intecture");
     api_sock.set_curve_server(true);
     server_cert.apply(&mut api_sock);
-    try!(api_sock.bind(&format!("tcp://*:{}", config.api_port)));
+    api_sock.bind(&format!("tcp://*:{}", config.api_port))?;
 
     let _auth = ZapHandler::new(None, &server_cert, &server_cert, "127.0.0.1", config.update_port, true);
 
@@ -92,10 +92,10 @@ fn start() -> Result<()> {
         let api_lookup = api_create.clone();
 
         let mut api = Api::new(api_sock);
-        api.add("cert::create", move |sock: &mut ZSock, endpoint_frame: ZFrame| { let r = api_create.borrow_mut().create(sock, endpoint_frame); error_handler(sock, r) });
-        api.add("cert::delete", move |sock: &mut ZSock, endpoint_frame: ZFrame| { let r = api_delete.borrow_mut().delete(sock, endpoint_frame); error_handler(sock, r) });
-        api.add("cert::list", move |sock: &mut ZSock, _: ZFrame| { let r = api_list.borrow_mut().list(sock); error_handler(sock, r) });
-        api.add("cert::lookup", move |sock: &mut ZSock, _: ZFrame| { let r = api_lookup.borrow_mut().lookup(sock); error_handler(sock, r) });
+        api.add("cert::create", move |s: &mut ZSock, f: ZFrame, id: Option<Vec<u8>>| { let i = id.unwrap(); let r = api_create.borrow_mut().create(s, f, &i); error_handler(s, &i, r) });
+        api.add("cert::delete", move |s: &mut ZSock, f: ZFrame, id: Option<Vec<u8>>| { let i = id.unwrap(); let r = api_delete.borrow_mut().delete(s, f, &i); error_handler(s, &i, r) });
+        api.add("cert::list", move |s: &mut ZSock, _: ZFrame, id: Option<Vec<u8>>| { let i = id.unwrap(); let r = api_list.borrow_mut().list(s, &i); error_handler(s, &i, r) });
+        api.add("cert::lookup", move |s: &mut ZSock, _: ZFrame, id: Option<Vec<u8>>| { let i = id.unwrap(); let r = api_lookup.borrow_mut().lookup(s, &i); error_handler(s, &i, r) });
         service.add_endpoint(api).unwrap();
 
         service.start(None).unwrap();
@@ -105,19 +105,19 @@ fn start() -> Result<()> {
     signal.recv().unwrap();
 
     // Terminate loop
-    try!(parent.signal(1));
+    parent.signal(1)?;
     thread.join().unwrap();
 
     Ok(())
 }
 
-fn error_handler(sock: &mut ZSock, result: Result<()>) -> StdResult<(), DError> {
+fn error_handler(sock: &mut ZSock, router_id: &[u8], result: Result<()>) -> StdResult<(), DError> {
     match result {
         Ok(_) => Ok(()),
         Err(e) => {
             let derror: DError = e.into();
-            let msg = try!(ZMsg::new_err(&derror));
-            try!(msg.send(sock));
+            let msg = ZMsg::new_err(&derror, Some(router_id))?;
+            msg.send(sock)?;
             Err(derror)
         }
     }
@@ -135,9 +135,10 @@ mod tests {
         let mut server = ZSock::new_pull("inproc://server_test_error_handler").unwrap();
         server.set_rcvtimeo(Some(500));
 
-        assert!(error_handler(&mut client, Err(Error::Forbidden)).is_err());
+        assert!(error_handler(&mut client, b"router_id", Err(Error::Forbidden)).is_err());
 
         let msg = ZMsg::recv(&mut server).unwrap();
+        assert_eq!(msg.popstr().unwrap().unwrap(), "router_id");
         assert_eq!(msg.popstr().unwrap().unwrap(), "Err");
         assert_eq!(msg.popstr().unwrap().unwrap(), "Access to this endpoint is forbidden");
     }
