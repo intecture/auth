@@ -8,7 +8,7 @@
 
 use cert::CertType;
 use cert_cache::CertCache;
-use czmq::{ZCert, ZFrame, ZMsg, ZSock, ZSockType, ZSys};
+use czmq::{ZCert, ZFrame, ZMsg, ZSock, SocketType, ZSys};
 use error::Result;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -17,7 +17,7 @@ use std::str;
 use zdaemon::{Endpoint, Error as DError, ZMsgExtended};
 
 pub fn init(cert: &ZCert, update_port: u32, cert_cache: Rc<RefCell<CertCache>>) -> Result<(ZapPublisher, ZapSubscriber)> {
-    let mut xpub = ZSock::new(ZSockType::XPUB);
+    let mut xpub = ZSock::new(SocketType::XPUB);
     xpub.set_xpub_verbose(true);
     xpub.set_zap_domain("auth.intecture");
     xpub.set_curve_server(true);

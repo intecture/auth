@@ -43,7 +43,7 @@ impl RequestMeta {
 
 #[cfg(test)]
 mod tests {
-    use czmq::{ZCert, ZFrame, ZMsg, ZSock, ZSockType, ZSys};
+    use czmq::{ZCert, ZFrame, ZMsg, ZSock, SocketType, ZSys};
     use super::*;
 
     #[test]
@@ -52,14 +52,14 @@ mod tests {
 
         let mut zap = ZSock::new_rep("inproc://zeromq.zap.01").unwrap();
 
-        let mut server = ZSock::new(ZSockType::REP);
+        let mut server = ZSock::new(SocketType::REP);
         server.set_zap_domain("test");
         server.set_curve_server(true);
         let server_cert = ZCert::new().unwrap();
         server_cert.apply(&mut server);
         let port = server.bind("tcp://127.0.0.1:*[60000-]").unwrap();
 
-        let mut client = ZSock::new(ZSockType::REQ);
+        let mut client = ZSock::new(SocketType::REQ);
         client.set_curve_serverkey(server_cert.public_txt());
         let client_cert = ZCert::new().unwrap();
         client_cert.set_meta("name", "ben.dover");

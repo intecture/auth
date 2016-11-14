@@ -29,7 +29,7 @@ use api::CertApi;
 use cert_cache::CertCache;
 use chan_signal::Signal;
 use config::Config;
-use czmq::{ZCert, ZFrame, ZMsg, ZSock, ZSockType, ZSys};
+use czmq::{ZCert, ZFrame, ZMsg, ZSock, SocketType, ZSys};
 use error::Result;
 use inauth_client::{CertType, ZapHandler};
 use std::cell::RefCell;
@@ -69,7 +69,7 @@ fn start() -> Result<()> {
 
     let mut persistence = try!(PersistDisk::new(&config.cert_path));
 
-    let mut api_sock = ZSock::new(ZSockType::REP);
+    let mut api_sock = ZSock::new(SocketType::REP);
     api_sock.set_zap_domain("auth.intecture");
     api_sock.set_curve_server(true);
     server_cert.apply(&mut api_sock);

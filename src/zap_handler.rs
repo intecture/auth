@@ -8,7 +8,7 @@
 
 use cert::{Cert, CertType};
 use cert_cache::CertCache;
-use czmq::{ZCert, ZFrame, ZMsg, ZPoller, ZSock, ZSockType, ZSys};
+use czmq::{ZCert, ZFrame, ZMsg, ZPoller, ZSock, SocketType, ZSys};
 use error::{Error, Result};
 use std::fmt;
 use std::thread::{JoinHandle, spawn};
@@ -40,7 +40,7 @@ impl ZapHandler {
         let zap = try!(ZSock::new_rep(ZAP_ENDPOINT));
         zap.set_linger(0);
 
-        let mut subscriber = ZSock::new(ZSockType::SUB);
+        let mut subscriber = ZSock::new(SocketType::SUB);
         subscriber.set_curve_serverkey(auth_cert.public_txt());
         cert.apply(&mut subscriber);
         subscriber.set_linger(0);
@@ -252,7 +252,7 @@ impl<'a> fmt::Debug for ZapRequest<'a> {
 mod tests {
     use cert::{Cert, CertType};
     use cert_cache::CertCache;
-    use czmq::{ZCert, ZMsg, ZSock, ZSockType, ZSys};
+    use czmq::{ZCert, ZMsg, ZSock, SocketType, ZSys};
     use std::thread::sleep;
     use std::time::Duration;
     use super::*;
@@ -272,7 +272,7 @@ mod tests {
         let mut publisher = ZSock::new_pub("inproc://zap_handler_test_pub").unwrap();
         publisher.set_sndtimeo(Some(500));
 
-        let subscriber = ZSock::new(ZSockType::SUB);
+        let subscriber = ZSock::new(SocketType::SUB);
         subscriber.set_subscribe(CertType::User.to_str());
         subscriber.connect("inproc://zap_handler_test_pub").unwrap();
 
