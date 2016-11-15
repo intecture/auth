@@ -38,7 +38,8 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
             Err(_) => return Err(Error::InvalidArg),
         };
 
-        let reply = ZMsg::new_ok(Some(router_id))?;
+        let reply = ZMsg::new_ok()?;
+        reply.pushbytes(router_id)?;
         for cert in self.cert_cache.borrow().dump(CertType::from_str(&cert_type)?) {
             reply.addstr(cert.name())?;
         }
@@ -55,7 +56,8 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
 
         match self.cert_cache.borrow().get_name(&name) {
             Some(cert) => {
-                let reply = ZMsg::new_ok(Some(router_id))?;
+                let reply = ZMsg::new_ok()?;
+                reply.pushbytes(router_id)?;
                 reply.addstr(cert.public_txt())?;
                 reply.send(sock)?;
                 Ok(())
@@ -100,7 +102,8 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
         msg.send(&mut self.publisher)?;
 
         // Reply cert
-        let msg = ZMsg::new_ok(Some(router_id))?;
+        let msg = ZMsg::new_ok()?;
+        msg.pushbytes(router_id)?;
         msg.addstr(cert.public_txt())?;
         msg.addstr(cert.secret_txt())?;
         msg.addbytes(&cert.encode_meta())?;
@@ -138,7 +141,8 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
             &cert.public_txt(),
         ])?;
 
-        let msg = ZMsg::new_ok(Some(router_id))?;
+        let msg = ZMsg::new_ok()?;
+        msg.pushbytes(router_id)?;
         msg.send(sock)?;
 
         Ok(())

@@ -206,7 +206,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "zdaemon"
 version = "0.0.1"
-source = "git+https://github.com/betweenlines/zdaemon.git?branch=dev#907fd1d68b3954bf93969c634cb7dfc7f6d7039a"
+source = "git+https://github.com/betweenlines/zdaemon.git?branch=dev#738334ce926ac29c94410a43c77e47ba72b08e6d"
 dependencies = [
  "czmq 0.0.5 (git+https://github.com/petehayes102/rust-czmq.git?branch=dev)",
  "rustc-serialize 0.3.21 (registry+https://github.com/rust-lang/crates.io-index)",
