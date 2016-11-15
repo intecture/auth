@@ -39,6 +39,7 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
         };
 
         let reply = ZMsg::new_ok()?;
+        reply.pushstr("")?;
         reply.pushbytes(router_id)?;
         for cert in self.cert_cache.borrow().dump(CertType::from_str(&cert_type)?) {
             reply.addstr(cert.name())?;
@@ -57,6 +58,7 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
         match self.cert_cache.borrow().get_name(&name) {
             Some(cert) => {
                 let reply = ZMsg::new_ok()?;
+                reply.pushstr("")?;
                 reply.pushbytes(router_id)?;
                 reply.addstr(cert.public_txt())?;
                 reply.send(sock)?;
@@ -103,6 +105,7 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
 
         // Reply cert
         let msg = ZMsg::new_ok()?;
+        msg.pushstr("")?;
         msg.pushbytes(router_id)?;
         msg.addstr(cert.public_txt())?;
         msg.addstr(cert.secret_txt())?;
@@ -142,6 +145,7 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
         ])?;
 
         let msg = ZMsg::new_ok()?;
+        msg.pushstr("")?;
         msg.pushbytes(router_id)?;
         msg.send(sock)?;
 
@@ -176,6 +180,7 @@ mod tests {
 
         let reply = ZMsg::recv(&mut client).unwrap();
         assert_eq!(reply.popstr().unwrap().unwrap(), "router_id");
+        assert_eq!(reply.popstr().unwrap().unwrap(), "");
         assert_eq!(reply.popstr().unwrap().unwrap(), "Ok");
         assert_eq!(reply.popstr().unwrap().unwrap(), "luke_vader");
 
@@ -184,6 +189,7 @@ mod tests {
 
         let reply = ZMsg::recv(&mut client).unwrap();
         assert_eq!(reply.popstr().unwrap().unwrap(), "router_id");
+        assert_eq!(reply.popstr().unwrap().unwrap(), "");
         assert_eq!(reply.popstr().unwrap().unwrap(), "Ok");
         assert_eq!(reply.popstr().unwrap().unwrap(), "luke.jedi.org");
     }
@@ -208,6 +214,7 @@ mod tests {
 
         let reply = ZMsg::recv(&mut client).unwrap();
         assert_eq!(reply.popstr().unwrap().unwrap(), "router_id");
+        assert_eq!(reply.popstr().unwrap().unwrap(), "");
         assert_eq!(reply.popstr().unwrap().unwrap(), "Ok");
         assert_eq!(reply.popstr().unwrap().unwrap(), cert.public_txt());
     }
@@ -227,8 +234,9 @@ mod tests {
         api.do_create(&mut server, b"router_id").unwrap();
 
         let reply = ZMsg::recv(&mut client).unwrap();
-        assert_eq!(reply.size(), 5);
+        assert_eq!(reply.size(), 6);
         assert_eq!(reply.popstr().unwrap().unwrap(), "router_id");
+        assert_eq!(reply.popstr().unwrap().unwrap(), "");
         assert_eq!(reply.popstr().unwrap().unwrap(), "Ok");
         let pubkey = reply.popstr().unwrap().unwrap();
 
@@ -259,6 +267,7 @@ mod tests {
 
         let reply = ZMsg::recv(&mut client).unwrap();
         assert_eq!(reply.popstr().unwrap().unwrap(), "router_id");
+        assert_eq!(reply.popstr().unwrap().unwrap(), "");
         assert_eq!(reply.popstr().unwrap().unwrap(), "Ok");
 
         let sub_reply = ZMsg::recv(&mut subscriber).unwrap();
