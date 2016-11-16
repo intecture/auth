@@ -17,6 +17,10 @@ inauth_start() {
     echo "Starting inauth."
     /usr/bin/touch ${pidfile}
     /usr/sbin/daemon -cf -p ${pidfile} ${command}
+
+    # Prevent race condition between API clients authenticating and
+    # auth handler receiving certs from Publisher.
+    sleep 1
 }
 
 inauth_cleanup() {
