@@ -29,6 +29,11 @@ start() {
     daemon $inauth "&"
     retval=$?
     echo
+
+    # Prevent race condition between API clients authenticating and
+    # auth handler receiving certs from Publisher.
+    sleep 1
+
     return $retval
 }
 
