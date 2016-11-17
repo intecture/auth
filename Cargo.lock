@@ -60,7 +60,7 @@ dependencies = [
 [[package]]
 name = "czmq"
 version = "0.0.5"
-source = "git+https://github.com/petehayes102/rust-czmq.git?branch=dev#846db4dde983c10df3fa240c2a806be55001c5b0"
+source = "git+https://github.com/petehayes102/rust-czmq.git?branch=dev#826c2ca34c5004182312c0cc3865685522e76d5f"
 dependencies = [
  "bitflags 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "czmq-sys 0.0.3 (git+https://github.com/petehayes102/rust-czmq.git?branch=dev)",
@@ -70,7 +70,7 @@ dependencies = [
 [[package]]
 name = "czmq-sys"
 version = "0.0.3"
-source = "git+https://github.com/petehayes102/rust-czmq.git?branch=dev#846db4dde983c10df3fa240c2a806be55001c5b0"
+source = "git+https://github.com/petehayes102/rust-czmq.git?branch=dev#826c2ca34c5004182312c0cc3865685522e76d5f"
 dependencies = [
  "libc 0.2.17 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
