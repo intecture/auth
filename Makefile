@@ -1,5 +1,6 @@
 TARGET = release
 PREFIX = /usr/local
+SYSCONFDIR = "$(PREFIX)/etc"
 
 all:
 ifeq ($(TARGET), release)
@@ -9,9 +10,9 @@ else
 endif
 
 install:
-	mkdir -p $(PREFIX)/etc/intecture/certs
-	sed 's~<CFGPATH>~$(PREFIX)/etc/intecture~' resources/auth.json > $(PREFIX)/etc/intecture/auth.json
-	chmod 0644 $(PREFIX)/etc/intecture/auth.json
+	mkdir -p $(SYSCONFDIR)/intecturecerts
+	sed 's~{{sysconfdir}}~$(SYSCONFDIR)~' resources/auth.json.tpl > $(SYSCONFDIR)/intecture/auth.json
+	chmod 0644 $(SYSCONFDIR)/intecture/auth.json
 	install -m 0755 target/$(TARGET)/inauth $(PREFIX)/bin/
 	install -m 0755 target/$(TARGET)/inauth_cli $(PREFIX)/bin/
 	if [ -f /etc/rc.conf ]; then \
@@ -29,14 +30,15 @@ install:
 	fi;
 
 uninstall:
-	rm -f $(PREFIX)/bin/inauth
-	rm -f $(PREFIX)/bin/inauth_cli
-	rm -f $(PREFIX)/etc/intecture/auth.json
+	rm -f $(PREFIX)/bin/inauth \
+		  $(PREFIX)/bin/inauth_cli \
+	      $(SYSCONFDIR)/intecture/auth.json \
+		  /lib/systemd/system/inauth.service \
+		  /usr/lib/systemd/system/inauth.service \
+		  /etc/init.d/inauth \
+	 	  /etc/rc.d/inauth
+	rmdir --ignore-fail-on-non-empty $(SYSCONFDIR)/intecture/certs
 	rmdir --ignore-fail-on-non-empty $(PREFIX)/etc/intecture
-	rm -f /lib/systemd/system/inauth.service
-	rm -f /usr/lib/systemd/system/inauth.service
-	rm -f /etc/init.d/inauth
-	rm -f /etc/rc.d/inauth
 
 test:
 ifeq ($(TARGET), release)
