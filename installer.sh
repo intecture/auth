@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/bin/sh
 # Copyright 2015-2016 Intecture Developers. See the COPYRIGHT file at the
 # top-level directory of this distribution and at
 # https://intecture.io/COPYRIGHT.
