@@ -11,39 +11,10 @@
 set -u
 
 # Globals
-prefix=""
-libdir=""
-sysconfdir=""
+prefix="{{prefix}}"
+libdir="{{libdir}}"
+sysconfdir="{{sysconfdir}}"
 ostype="$(uname -s)"
-
-case "$ostype" in
-    Linux)
-        prefix="/usr"
-		libdir="$prefix/lib"
-        sysconfdir="/etc"
-
-		if [ -d "${libdir}64" ]; then
-			libdir="${libdir}64"
-		fi
-        ;;
-
-    FreeBSD)
-        prefix="/usr/local"
-		libdir="$prefix/lib"
-        sysconfdir="$prefix/etc"
-        ;;
-
-    Darwin)
-        prefix="/usr/local"
-		libdir="$prefix/lib"
-        sysconfdir="$prefix/etc"
-        ;;
-
-    *)
-        echo "unrecognized OS type: $ostype" >&2
-        exit 1
-        ;;
-esac
 
 do_install() {
     if ! $(pkg-config --exists libzmq); then
@@ -109,7 +80,6 @@ do_install() {
 	fi
 
     mkdir -p $sysconfdir/intecture/certs
-    sed "s~{{sysconfdir}}~$sysconfdir~" auth.json.tpl > auth.json
     install -m 644 auth.json $sysconfdir/intecture/
 
     install -m 755 inauth $prefix/bin
