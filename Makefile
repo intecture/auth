@@ -10,7 +10,7 @@ else
 endif
 
 install:
-	mkdir -p $(SYSCONFDIR)/intecturecerts
+	mkdir -p $(SYSCONFDIR)/intecture/certs
 	sed 's~{{sysconfdir}}~$(SYSCONFDIR)~' resources/auth.json.tpl > $(SYSCONFDIR)/intecture/auth.json
 	chmod 0644 $(SYSCONFDIR)/intecture/auth.json
 	install -m 0755 target/$(TARGET)/inauth $(PREFIX)/bin/
@@ -38,7 +38,7 @@ uninstall:
 		  /etc/init.d/inauth \
 	 	  /etc/rc.d/inauth
 	rmdir --ignore-fail-on-non-empty $(SYSCONFDIR)/intecture/certs
-	rmdir --ignore-fail-on-non-empty $(PREFIX)/etc/intecture
+	rmdir --ignore-fail-on-non-empty $(SYSCONFDIR)/intecture
 
 test:
 ifeq ($(TARGET), release)
