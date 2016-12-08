@@ -37,8 +37,12 @@ uninstall:
 		  /usr/lib/systemd/system/inauth.service \
 		  /etc/init.d/inauth \
 	 	  /etc/rc.d/inauth
-	rmdir --ignore-fail-on-non-empty $(SYSCONFDIR)/intecture/certs
-	rmdir --ignore-fail-on-non-empty $(SYSCONFDIR)/intecture
+	if [ "$(ls -A $SYSCONFDIR/intecture/certs)" ]; then \
+		rmdir $(SYSCONFDIR)/intecture/certs; \
+		if [ "$(ls -A $SYSCONFDIR/intecture)" ]; then \
+			rmdir $(SYSCONFDIR)/intecture; \
+		fi; \
+	fi
 
 test:
 ifeq ($(TARGET), release)
