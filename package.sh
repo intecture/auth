@@ -108,12 +108,12 @@ main() {
     cp "$_cargodir/resources/init/systemd" "$_pkgdir/init"
 
     # ZeroMQ assets
-    cp "$libdir/libzmq.so" "$_pkgdir/lib/"
+    cp "$libdir/libzmq.$libext" "$_pkgdir/lib/"
     cp "$libdir/pkgconfig/libzmq.pc" "$_pkgdir/lib/pkgconfig/"
     cp "$prefix/include/zmq.h" "$_pkgdir/include/"
 
     # CZMQ assets
-    cp "$libdir/libczmq.so" "$_pkgdir/lib/"
+    cp "$libdir/libczmq.$libext" "$_pkgdir/lib/"
     cp "$libdir/pkgconfig/libczmq.pc" "$_pkgdir/lib/pkgconfig/"
     cp "$prefix/include/czmq.h" "$_pkgdir/include/"
     cp "$prefix/include/czmq_library.h" "$_pkgdir/include/"
