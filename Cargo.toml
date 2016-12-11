@@ -7,6 +7,9 @@ description = "Authentication for Intecture infrastructure. Intecture is the dev
 keywords = ["intecture", "auth"]
 homepage = "https://intecture.io"
 repository = "https://github.com/intecture/auth"
+exclude = [
+    "resources/*"
+]
 
 [dev-dependencies]
 
