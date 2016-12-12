@@ -13,6 +13,7 @@ set -u
 # Globals
 prefix=""
 libdir=""
+libext=""
 sysconfdir=""
 ostype="$(uname -s)"
 make="make"
@@ -21,6 +22,7 @@ case "$ostype" in
     Linux)
         prefix="/usr"
         sysconfdir="/etc"
+        libext="so"
 
         # When we can statically link successfully, we should be able
         # to produce vendor-agnostic packages.
@@ -40,6 +42,7 @@ case "$ostype" in
         ostype="freebsd"
         prefix="/usr/local"
 		libdir="$prefix/lib"
+        libext="so"
         sysconfdir="$prefix/etc"
         make="gmake"
         ;;
@@ -48,6 +51,7 @@ case "$ostype" in
         ostype="darwin"
         prefix="/usr/local"
 		libdir="$prefix/lib"
+        libext="dylib"
         sysconfdir="$prefix/etc"
         ;;
 
@@ -152,7 +156,9 @@ main() {
     # Configure installer.sh paths
     sed "s~{{prefix}}~$prefix~" < "$_cargodir/installer.sh" |
     sed "s~{{libdir}}~$libdir~" |
-    sed "s~{{sysconfdir}}~$sysconfdir~" > "$_pkgdir/installer.sh"
+    sed "s~{{libext}}~$libext~" |
+    sed "s~{{sysconfdir}}~$sysconfdir~" |
+    sed "s~{{ostype}}~$ostype~" > "$_pkgdir/installer.sh"
     chmod u+x "$_pkgdir/installer.sh"
 
     local _pkgstoredir="$_cargodir/.pkg/$ostype"
