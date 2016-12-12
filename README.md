@@ -6,42 +6,26 @@ Intecture is a developer friendly, language agnostic configuration management to
 * Standard programming interface. No DSL. No magic.
 * Rust API library (and bindings for popular languages)
 
-You can find out more at [intecture.io](http://intecture.io).
+You can find out more at [intecture.io](https://intecture.io).
+
+# System Requirements
+
+Intecture relies on [ZeroMQ](http://zeromq.org) for communication between your project and your managed hosts. The Intecture installer will install these dependencies automatically, however if you are building Intecture manually, you will need to install ZeroMQ and CZMQ before proceeding.
 
 # Install
 
-## Auto
-
-The quick way to get up and running is by using the Intecture installer.
+The best way to get up and running is by using the Intecture installer:
 
 ```
-$ curl -sSf https://static.intecture.io/install.sh | sh
+$ curl -sSf https://get.intecture.io/ | sh -s -- auth
 ```
-
-## Manual
-
-First, as this project is written in Rust, you'll need...well, [Rust!](https://www.rust-lang.org)
-
-Next, clone this repository to your local machine and use the Makefile to build it:
-
-```
-$ git clone https://github.com/intecture/auth
-$ cd auth/
-$ make
-$ make test && sudo make install
-```
-
-Note that we chained the test and install targets. Thus if the tests fail, we don't install a bad binary!
-
-Once this has finished, you should have a shiny new binary called *inauthserv*, which lives in */usr/local/bin* if it exists, or */usr/bin* if not.
 
 # Uninstall
 
-Run the uninstall target on the Makefile:
+If you used the Intecture installer to install the Auth service, you can also use it for removal:
 
 ```
-$ cd auth/
-$ sudo make uninstall
+$ curl -sSf https://get.intecture.io/ | sh -s -- -u auth
 ```
 
 # Support
