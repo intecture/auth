@@ -1,4 +1,4 @@
-# Intecture [![Build Status](https://travis-ci.org/intecture/auth.svg?branch=master)](https://travis-ci.org/Intecture/auth) [![Coverage Status](https://coveralls.io/repos/github/Intecture/auth/badge.svg?branch=master)](https://coveralls.io/github/Intecture/auth?branch=master)
+# Intecture [![Build Status](https://travis-ci.org/intecture/auth.svg?branch=master)](https://travis-ci.org/intecture/auth) [![Coverage Status](https://coveralls.io/repos/github/Intecture/auth/badge.svg?branch=master)](https://coveralls.io/github/Intecture/auth?branch=master)
 
 Intecture is a developer friendly, language agnostic configuration management tool for server systems.
 
