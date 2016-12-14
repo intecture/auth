@@ -37,9 +37,9 @@ uninstall:
 		  /usr/lib/systemd/system/inauth.service \
 		  /etc/init.d/inauth \
 	 	  /etc/rc.d/inauth
-	if [ "$(ls -A $SYSCONFDIR/intecture/certs)" ]; then \
+	if [ ! "$(ls -A $SYSCONFDIR/intecture/certs)" ]; then \
 		rmdir $(SYSCONFDIR)/intecture/certs; \
-		if [ "$(ls -A $SYSCONFDIR/intecture)" ]; then \
+		if [ ! "$(ls -A $SYSCONFDIR/intecture)" ]; then \
 			rmdir $(SYSCONFDIR)/intecture; \
 		fi; \
 	fi
