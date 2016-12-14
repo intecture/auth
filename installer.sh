@@ -14,19 +14,19 @@ set -u
 prefix="{{prefix}}"
 libdir="{{libdir}}"
 sysconfdir="{{sysconfdir}}"
-ostype="{{ostype}}"
+os="{{os}}"
 
 do_install() {
     local _one=
     local _two=
 
     if ! $(pkg-config --exists libzmq); then
-        if [ "$ostype" = "darwin"]; then
-            $_one="5"
-            $_two=$libext
+        if [ "$os" = "darwin" ]; then
+            _one="5"
+            _two=$libext
         else
-            $_one=$libext
-            $_two="5"
+            _one=$libext
+            _two="5"
         fi
         install -m 755 lib/libzmq.$libext $libdir/libzmq.$_one.$_two
         ln -s $libdir/libzmq.$_one.$_two $libdir/libzmq.$libext
@@ -35,12 +35,12 @@ do_install() {
     fi
 
     if ! $(pkg-config --exists libczmq); then
-        if [ "$ostype" = "darwin"]; then
-            $_one="4"
-            $_two=$libext
+        if [ "$os" = "darwin" ]; then
+            _one="4"
+            _two=$libext
         else
-            $_one=$libext
-            $_two="4"
+            _one=$libext
+            _two="4"
         fi
         install -m 755 lib/libczmq.$libext $libdir/libczmq.$_one.$_two
         ln -s $libdir/libczmq.$_one.$_two $libdir/libczmq.$libext
@@ -80,19 +80,22 @@ do_install() {
         install -m 644 include/zuuid.h $prefix/include/
     fi
 
-	if [ -f /etc/rc.conf ]; then
-		install -m 555 init/freebsd $sysconfdir/rc.d/inauth;
-	elif $(stat --format=%N /proc/1/exe|grep -qs systemd); then
-		if [ -d $prefix/usr/systemd/system ]; then
-			install -m 644 init/systemd $prefix/lib/systemd/system/inauth.service
-		elif [ -d /lib/systemd/system ]; then
-			install -m 644 init/systemd /lib/systemd/system/inauth.service
-		fi
-	elif [ -f $sysconfdir/redhat-release ]; then
-		install -m 755 init/redhat $sysconfdir/init.d/inauth
-	elif [ -f $sysconfdir/debian_version ]; then
-		install -m 755 init/debian $sysconfdir/init.d/inauth
-	fi
+    if $(stat --format=%N /proc/1/exe|grep -qs systemd); then
+        if [ -d $prefix/usr/systemd/system ]; then
+            install -m 644 systemd $prefix/lib/systemd/system/inauth.service
+        elif [ -d /lib/systemd/system ]; then
+            install -m 644 systemd /lib/systemd/system/inauth.service
+        fi
+    else
+        case "$os" in
+            centos | fedora | debian | ubuntu)
+                install -m 755 init $sysconfdir/init.d/inauth
+                ;;
+            freebsd)
+        	    install -m 555 init $sysconfdir/rc.d/inauth;
+                ;;
+        esac
+    fi
 
     mkdir -p $sysconfdir/intecture/certs
     install -m 644 auth.json $sysconfdir/intecture/
@@ -110,8 +113,12 @@ do_uninstall() {
 		  $sysconfdir/init.d/inauth \
 		  $sysconfdir/rc.d/inauth
 
-	rmdir --ignore-fail-on-non-empty $sysconfdir/intecture/certs
-    rmdir --ignore-fail-on-non-empty $sysconfdir/intecture
+    if [ ! "$(ls -A $sysconfdir/intecture/certs)" ]; then
+		rmdir "$sysconfdir/intecture/certs"
+		if [ ! "$(ls -A $sysconfdir/intecture)" ]; then
+			rmdir "$sysconfdir/intecture"
+		fi
+	fi
 }
 
 main() {
