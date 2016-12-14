@@ -19,21 +19,34 @@
 inauth="/usr/bin/inauth"
 config="/etc/intecture/auth.json"
 prog="inauth"
+pidfile="/var/run/$prog.pid"
 
 start() {
     [ -x $inauth ] || exit 5
     [ -f $config ] || exit 6
-    echo -n $"Starting $prog: "
-    daemon $inauth "&"
-    retval=$?
-    echo
 
-    return $retval
+    echo -n $"Starting $prog: "
+
+    # Check if daemon already started
+    local pids=$(pidof $prog)
+    if [ -n "$pids" ]; then
+        echo -n "$prog (pid $pids) is already running" && warning
+        echo
+        return 0
+    fi
+
+    nohup "$inauth" >/dev/null 2>&1 &
+    RETVAL=$?
+
+    # Write pid to file and print status
+    [ $RETVAL -eq 0 ] && echo $! > $pidfile && success || failure
+    echo
+    return $RETVAL
 }
 
 stop() {
     echo -n $"Stopping $prog: "
-    killproc $prog
+    killproc -p $pidfile $prog
     retval=$?
     echo
     return $retval
