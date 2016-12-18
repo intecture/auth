@@ -113,12 +113,12 @@ do_uninstall() {
 		  $sysconfdir/init.d/inauth \
 		  $sysconfdir/rc.d/inauth
 
-    if [ ! "$(ls -A $sysconfdir/intecture/certs)" ]; then
-		rmdir "$sysconfdir/intecture/certs"
-		if [ ! "$(ls -A $sysconfdir/intecture)" ]; then
-			rmdir "$sysconfdir/intecture"
-		fi
-	fi
+    if [ -d $sysconfdir/intecture/certs -a -z "$(ls -A $sysconfdir/intecture/certs)" ]; then
+        rmdir "$sysconfdir/intecture/certs"
+    fi
+    if [ -d $sysconfdir/intecture -a -z "$(ls -A $sysconfdir/intecture)" ]; then
+        rmdir "$sysconfdir/intecture"
+    fi
 }
 
 main() {
