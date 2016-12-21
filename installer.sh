@@ -13,14 +13,19 @@ set -u
 # Globals
 prefix="{{prefix}}"
 libdir="{{libdir}}"
+libext="{{libext}}"
 sysconfdir="{{sysconfdir}}"
+pkgconf="{{pkgconf}}"
+pkgconfdir="{{pkgconfdir}}"
 os="{{os}}"
 
 do_install() {
+    need_cmd $pkgconf
+
     local _one=
     local _two=
 
-    if ! $(pkg-config --exists libzmq); then
+    if ! $($pkgconf --exists libzmq); then
         if [ "$os" = "darwin" ]; then
             _one="5"
             _two=$libext
@@ -30,11 +35,15 @@ do_install() {
         fi
         install -m 755 lib/libzmq.$libext $libdir/libzmq.$_one.$_two
         ln -s $libdir/libzmq.$_one.$_two $libdir/libzmq.$libext
-        install -m 644 lib/pkgconfig/libzmq.pc $libdir/pkgconfig/
+        install -m 644 lib/pkgconfig/libzmq.pc $pkgconfdir
         install -m 644 include/zmq.h $prefix/include/
+
+        if [ "$os" = "freebsd" ]; then
+            install -m 644 lib/libstdc++.so.6 $libdir/
+        fi
     fi
 
-    if ! $(pkg-config --exists libczmq); then
+    if ! $($pkgconf --exists libczmq); then
         if [ "$os" = "darwin" ]; then
             _one="4"
             _two=$libext
@@ -44,7 +53,7 @@ do_install() {
         fi
         install -m 755 lib/libczmq.$libext $libdir/libczmq.$_one.$_two
         ln -s $libdir/libczmq.$_one.$_two $libdir/libczmq.$libext
-		install -m 644 lib/pkgconfig/libczmq.pc $libdir/pkgconfig/
+		install -m 644 lib/pkgconfig/libczmq.pc $pkgconfdir
         install -m 644 include/czmq.h $prefix/include/
         install -m 644 include/czmq_library.h $prefix/include/
         install -m 644 include/czmq_prelude.h $prefix/include/
@@ -80,22 +89,22 @@ do_install() {
         install -m 644 include/zuuid.h $prefix/include/
     fi
 
-    if $(stat --format=%N /proc/1/exe|grep -qs systemd); then
-        if [ -d $prefix/usr/systemd/system ]; then
-            install -m 644 systemd $prefix/lib/systemd/system/inauth.service
-        elif [ -d /lib/systemd/system ]; then
-            install -m 644 systemd /lib/systemd/system/inauth.service
-        fi
-    else
-        case "$os" in
-            centos | fedora | debian | ubuntu)
+    case "$os" in
+        centos | fedora | debian | ubuntu)
+            if $(stat --format=%N /proc/1/exe|grep -qs systemd); then
+                if [ -d $prefix/usr/systemd/system ]; then
+                    install -m 644 systemd $prefix/lib/systemd/system/inauth.service
+                elif [ -d /lib/systemd/system ]; then
+                    install -m 644 systemd /lib/systemd/system/inauth.service
+                fi
+            else
                 install -m 755 init $sysconfdir/init.d/inauth
-                ;;
-            freebsd)
-        	    install -m 555 init $sysconfdir/rc.d/inauth;
-                ;;
-        esac
-    fi
+            fi
+            ;;
+        freebsd)
+            install -m 555 init $sysconfdir/rc.d/inauth;
+            ;;
+    esac
 
     mkdir -p $sysconfdir/intecture/certs
     install -m 644 auth.json $sysconfdir/intecture/
@@ -118,6 +127,13 @@ do_uninstall() {
     fi
     if [ -d $sysconfdir/intecture -a -z "$(ls -A $sysconfdir/intecture)" ]; then
         rmdir "$sysconfdir/intecture"
+    fi
+}
+
+need_cmd() {
+    if ! command -v "$1" > /dev/null 2>&1; then
+        echo "need '$1' (command not found)" >&2
+        exit 1
     fi
 }
 

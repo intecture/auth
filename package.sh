@@ -11,19 +11,17 @@
 set -u
 
 # Globals
-prefix=""
-libdir=""
-libext=""
-sysconfdir=""
+prefix=
+libdir=
+libext=
+sysconfdir=
+pkgconf="pkg-config"
+pkgconfdir=
 os="$(uname -s)"
 make="make"
 
 case "$os" in
     Linux)
-        prefix="/usr"
-        sysconfdir="/etc"
-        libext="so"
-
         # When we can statically link successfully, we should be able
         # to produce vendor-agnostic packages.
         if [ -f "/etc/centos-release" ]; then
@@ -42,14 +40,21 @@ case "$os" in
             echo "unsupported Linux flavour" >&2
             exit 1
         fi
+
+        prefix="/usr"
+        sysconfdir="/etc"
+        pkgconfdir="$libdir/pkgconfig"
+        libext="so"
         ;;
 
     FreeBSD)
         os="freebsd"
         prefix="/usr/local"
 		libdir="$prefix/lib"
-        libext="so"
         sysconfdir="$prefix/etc"
+        pkgconf="pkgconf"
+        pkgconfdir="$prefix/libdata/pkgconfig"
+        libext="so"
         make="gmake"
         ;;
 
@@ -57,8 +62,9 @@ case "$os" in
         os="darwin"
         prefix="/usr/local"
 		libdir="$prefix/lib"
-        libext="dylib"
         sysconfdir="$prefix/etc"
+        pkgconfdir="$libdir/pkgconfig"
+        libext="dylib"
         ;;
 
     *)
@@ -73,23 +79,23 @@ main() {
     cd "$_tmpdir"
 
     # ZeroMQ dependency
-    if ! $(pkg-config --exists libzmq) || [ $(pkg-config libzmq --modversion) != "4.2.0" ]; then
+    if ! $($pkgconf --exists libzmq) || [ $($pkgconf libzmq --modversion) != "4.2.0" ]; then
         curl -sSOL https://github.com/zeromq/libzmq/releases/download/v4.2.0/zeromq-4.2.0.tar.gz
         tar zxf zeromq-4.2.0.tar.gz
         cd zeromq-4.2.0
         ./autogen.sh
-        ./configure --prefix=$prefix --libdir=$libdir
+        ./configure --prefix=$prefix --libdir=$libdir --sysconfdir=$sysconfdir --with-pkgconfigdir=$pkgconfdir
         $make
         $make install
         cd ..
     fi
 
     # CZMQ dependency
-    if ! $(pkg-config --exists libczmq) || [ $(pkg-config libczmq --modversion) != "4.0.1" ]; then
+    if ! $($pkgconf --exists libczmq) || [ $($pkgconf libczmq --modversion) != "4.0.1" ]; then
         curl -sSOL https://github.com/zeromq/czmq/releases/download/v4.0.1/czmq-4.0.1.tar.gz
         tar zxf czmq-4.0.1.tar.gz
         cd czmq-4.0.1
-        ./configure --prefix=$prefix --libdir=$libdir
+        ./configure --prefix=$prefix --libdir=$libdir --sysconfdir=$sysconfdir --with-pkgconfigdir=$pkgconfdir
         $make
         $make install
         cd ..
@@ -167,11 +173,19 @@ main() {
     cp "$prefix/include/zsys.h" "$_pkgdir/include/"
     cp "$prefix/include/zuuid.h" "$_pkgdir/include/"
 
+    # GCC libc++ (FreeBSD only)
+    if [ "$os" = "freebsd" ]; then
+        # XXX Version is hardcoded...bleh!
+        cp "$libdir/gcc49/libstdc++.so.6" "$_pkgdir/lib/"
+    fi
+
     # Configure installer.sh paths
     sed "s~{{prefix}}~$prefix~" < "$_cargodir/installer.sh" |
     sed "s~{{libdir}}~$libdir~" |
     sed "s~{{libext}}~$libext~" |
     sed "s~{{sysconfdir}}~$sysconfdir~" |
+    sed "s~{{pkgconf}}~$pkgconf~" |
+    sed "s~{{pkgconfdir}}~$pkgconfdir~" |
     sed "s~{{os}}~$os~" > "$_pkgdir/installer.sh"
     chmod u+x "$_pkgdir/installer.sh"
 
