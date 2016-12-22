@@ -22,6 +22,10 @@ make="make"
 
 case "$os" in
     Linux)
+        prefix="/usr"
+        sysconfdir="/etc"
+        libext="so"
+
         # When we can statically link successfully, we should be able
         # to produce vendor-agnostic packages.
         if [ -f "/etc/centos-release" ]; then
@@ -41,10 +45,7 @@ case "$os" in
             exit 1
         fi
 
-        prefix="/usr"
-        sysconfdir="/etc"
         pkgconfdir="$libdir/pkgconfig"
-        libext="so"
         ;;
 
     FreeBSD)
