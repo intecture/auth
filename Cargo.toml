@@ -18,9 +18,9 @@ tempdir = "0.3.*"
 [dependencies]
 
 chan = "0.1"
-chan-signal = "0.1"
+chan-signal = "0.2"
 czmq = "0.1"
-docopt = "0.6"
+docopt = "0.7"
 rustc-serialize = "0.3"
 zdaemon = "0.0.2"
 zmq = "0.8"
