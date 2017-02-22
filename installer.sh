@@ -107,6 +107,9 @@ do_install() {
     esac
 
     mkdir -p $sysconfdir/intecture/certs
+    chmod 700 $sysconfdir/intecture/certs
+    chown root $sysconfdir/intecture/certs
+
     install -m 644 auth.json $sysconfdir/intecture/
 
     install -m 755 inauth $prefix/bin
