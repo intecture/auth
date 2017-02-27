@@ -26,13 +26,11 @@ mod error;
 use cert::{Cert, CertType};
 use config::Config;
 use docopt::Docopt;
-use error::{Error, Result};
+use error::Result;
 use std::{env, fs};
 use std::io::Read;
-use std::fmt::{Debug, Display};
 use std::path::Path;
 use std::process::exit;
-use std::result::Result as StdResult;
 
 static USAGE: &'static str = "
 Intecture Auth CLI.
@@ -64,18 +62,25 @@ fn main() {
         .and_then(|d| d.decode())
         .unwrap_or_else(|e| e.exit());
 
+    if let Err(e) = run(args) {
+        println!("{}", e);
+        exit(1);
+    }
+}
+
+fn run(args: Args) -> Result<()> {
     if args.flag_version {
         println!(env!("CARGO_PKG_VERSION"));
         exit(0);
     }
     else if args.cmd_user && args.cmd_add {
         let config_path = if args.flag_c.is_some() { args.flag_c.as_ref() } else { args.flag_config.as_ref() };
-        let config = try_exit(read_conf(config_path));
-        let cert = try_exit(Cert::new(&args.arg_username, CertType::User));
-        try_exit(cert.save_public(&format!("{}/{}.crt", &config.cert_path, &args.arg_username)));
+        let config = read_conf(config_path)?;
+        let cert = Cert::new(&args.arg_username, CertType::User)?;
+        cert.save_public(&format!("{}/{}.crt", &config.cert_path, &args.arg_username))?;
 
         if args.flag_s || args.flag_silent {
-            try_exit(cert.save_secret(&format!("{}.crt", &args.arg_username)));
+            cert.save_secret(&format!("{}.crt", &args.arg_username))?;
         } else {
             println!("**********
 * PLEASE NOTE: You must restart the Auth server before this certificate will become valid!
@@ -93,6 +98,8 @@ curve
 ------------------------COPY ABOVE THIS LINE-------------------------", args.arg_username, cert.public_txt(), cert.secret_txt());
         }
     }
+
+    Ok(())
 }
 
 fn read_conf<P: AsRef<Path>>(path: Option<P>) -> Result<Config> {
@@ -117,16 +124,6 @@ fn do_read_conf<P: AsRef<Path>>(path: P) -> Result<Config> {
     let mut json = String::new();
     fh.read_to_string(&mut json)?;
     Ok(serde_json::from_str(&json)?)
-}
-
-fn try_exit<T, E>(r: StdResult<T, E>) -> T
-    where E: Into<Error> + Debug + Display {
-    if let Err(e) = r {
-        println!("{:?}", e);
-        exit(1);
-    }
-
-    r.unwrap()
 }
 
 #[cfg(test)]
