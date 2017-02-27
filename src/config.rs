@@ -6,15 +6,10 @@
 // https://www.tldrlegal.com/l/mpl-2.0>. This file may not be copied,
 // modified, or distributed except according to those terms.
 
-use zdaemon::ConfigFile;
-
-#[derive(Debug)]
-#[derive(RustcDecodable, RustcEncodable)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub server_cert: String,
     pub cert_path: String,
     pub api_port: u32,
     pub update_port: u32,
 }
-
-impl ConfigFile for Config {}

@@ -7,12 +7,9 @@
 // modified, or distributed except according to those terms.
 
 extern crate czmq;
-extern crate zmq;
-
-// XXX These crates are only required for error module to compile. In
-// the future these dependencies should be removed.
-extern crate rustc_serialize;
+extern crate serde_json;
 extern crate zdaemon;
+extern crate zmq;
 
 #[allow(dead_code)]
 mod cert;
@@ -24,14 +21,3 @@ mod zap_handler;
 
 pub use cert::CertType;
 pub use zap_handler::ZapHandler;
-
-use error::Error;
-use std::convert;
-
-// Only client.rs uses zmq crate, so our ZMQ error handlers have to
-// go here.
-impl convert::From<zmq::EncodeError> for Error {
-    fn from(e: zmq::EncodeError) -> Error {
-        Error::ZmqEncode(format!("{}", e))
-    }
-}

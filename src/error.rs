@@ -7,9 +7,10 @@
 // modified, or distributed except according to those terms.
 
 use czmq;
-use rustc_serialize::json;
+use serde_json;
 use std::{convert, error, fmt, io, result};
 use zdaemon;
+use zmq;
 
 pub type Result<T> = result::Result<T, Error>;
 
@@ -27,9 +28,9 @@ pub enum Error {
     InvalidEndpoint,
     InvalidZapRequest,
     Io(io::Error),
-    JsonEncoder(json::EncoderError),
     MissingConf,
     PollerTimeout,
+    SerdeJson(serde_json::Error),
     ZapVersion,
     ZDaemon(zdaemon::Error),
     ZmqEncode(String),
@@ -50,9 +51,9 @@ impl fmt::Display for Error {
             Error::InvalidEndpoint => write!(f, "Invalid endpoint"),
             Error::InvalidZapRequest => write!(f, "Invalid ZAP request"),
             Error::Io(ref e) => write!(f, "IO error: {}", e),
-            Error::JsonEncoder(ref e) => write!(f, "JSON encoder error: {}", e),
-            Error::MissingConf => write!(f, "Cannot open Agent config"),
+            Error::MissingConf => write!(f, "Cannot open Auth config"),
             Error::PollerTimeout => write!(f, "Timeout while polling sockets"),
+            Error::SerdeJson(ref e) => write!(f, "Serde JSON error: {}", e),
             Error::ZapVersion => write!(f, "ZAP version is invalid"),
             Error::ZDaemon(ref e) => write!(f, "ZDaemon error: {}", e),
             Error::ZmqEncode(ref e) => write!(f, "Could not encode Z85 string: {}", e),
@@ -75,9 +76,9 @@ impl error::Error for Error {
             Error::InvalidEndpoint => "Invalid endpoint",
             Error::InvalidZapRequest => "Invalid ZAP request",
             Error::Io(ref e) => e.description(),
-            Error::JsonEncoder(ref e) => e.description(),
             Error::MissingConf => "Cannot open config",
             Error::PollerTimeout => "Timeout while polling sockets",
+            Error::SerdeJson(ref e) => e.description(),
             Error::ZapVersion => "ZAP version is invalid",
             Error::ZDaemon(ref e) => e.description(),
             Error::ZmqEncode(_) => "Could not encode Z85 string",
@@ -97,9 +98,9 @@ impl convert::From<io::Error> for Error {
     }
 }
 
-impl convert::From<json::EncoderError> for Error {
-    fn from(err: json::EncoderError) -> Error {
-        Error::JsonEncoder(err)
+impl convert::From<serde_json::Error> for Error {
+    fn from(err: serde_json::Error) -> Error {
+        Error::SerdeJson(err)
     }
 }
 
@@ -112,5 +113,11 @@ impl convert::From<zdaemon::Error> for Error {
 impl convert::From<Error> for zdaemon::Error {
     fn from(err: Error) -> zdaemon::Error {
         zdaemon::Error::Generic(Box::new(err))
+    }
+}
+
+impl convert::From<zmq::EncodeError> for Error {
+    fn from(err: zmq::EncodeError) -> Error {
+        Error::ZmqEncode(format!("{}", err))
     }
 }

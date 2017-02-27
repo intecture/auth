@@ -9,17 +9,23 @@
 extern crate chan;
 extern crate chan_signal;
 extern crate czmq;
+extern crate docopt;
 extern crate inauth_client;
 extern crate rustc_serialize;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+#[macro_use]
+extern crate serde_json;
 #[cfg(test)]
 extern crate tempdir;
 extern crate zdaemon;
+extern crate zmq;
 
 mod api;
 mod cert;
 mod cert_cache;
 mod config;
-#[allow(dead_code)]
 mod error;
 mod request_meta;
 mod storage;
@@ -30,32 +36,69 @@ use cert_cache::CertCache;
 use chan_signal::Signal;
 use config::Config;
 use czmq::{ZCert, ZFrame, ZMsg, ZSock, SocketType, ZSys};
+use docopt::Docopt;
 use error::Result;
 use inauth_client::{CertType, ZapHandler};
 use std::cell::RefCell;
-use std::fs::metadata;
+use std::{env, fs};
+use std::io::Read;
 use std::rc::Rc;
 use std::result::Result as StdResult;
+use std::path::Path;
 use std::process::exit;
 use std::thread::spawn;
 use storage::{PersistDisk, PersistenceAdaptor};
-use zdaemon::{Api, ConfigFile, Error as DError, Service, ZMsgExtended};
+use zdaemon::{Api, Error as DError, Service, ZMsgExtended};
+
+static USAGE: &'static str = "
+Intecture Auth.
+
+Usage:
+  inauth [(-c <path> | --config <path>)]
+  inauth (-h | --help)
+  inauth --version
+
+Options:
+  -c --config <path>    Path to auth.json, e.g. \"/usr/local/etc\"
+  -h --help             Show this screen.
+  --version             Print this script's version.
+";
+
+#[derive(Debug, RustcDecodable)]
+#[allow(non_snake_case)]
+struct Args {
+    flag_c: Option<String>,
+    flag_config: Option<String>,
+    flag_h: bool,
+    flag_help: bool,
+    flag_version: bool,
+}
 
 fn main() {
-    if let Err(e) = start() {
-        println!("{}", e);
-        exit(1);
+    let args: Args = Docopt::new(USAGE)
+        .and_then(|d| d.decode())
+        .unwrap_or_else(|e| e.exit());
+
+    if args.flag_version {
+        println!(env!("CARGO_PKG_VERSION"));
+        exit(0);
+    } else {
+        let config_path = if args.flag_c.is_some() { args.flag_c.as_ref() } else { args.flag_config.as_ref() };
+        if let Err(e) = start(config_path) {
+            println!("{}", e);
+            exit(1);
+        }
     }
 }
 
-fn start() -> Result<()> {
+fn start<P: AsRef<Path>>(path: Option<P>) -> Result<()> {
     let signal = chan_signal::notify(&[Signal::INT, Signal::TERM]);
     let (parent, child) = ZSys::create_pipe()?;
 
-    let config = Config::search("intecture/auth.json", None)?;
+    let config = read_conf(path)?;
 
     // Create new server cert if missing
-    let server_cert = match metadata(&config.server_cert) {
+    let server_cert = match fs::metadata(&config.server_cert) {
         Ok(_) => ZCert::load(&config.server_cert)?,
         Err(_) => {
             let c = ZCert::new()?;
@@ -125,11 +168,38 @@ fn error_handler(sock: &mut ZSock, router_id: &[u8], result: Result<()>) -> StdR
     }
 }
 
+fn read_conf<P: AsRef<Path>>(path: Option<P>) -> Result<Config> {
+    if let Some(p) = path {
+        do_read_conf(p)
+    }
+    else if let Ok(p) = env::var("INAUTH_CONFIG_DIR") {
+        do_read_conf(p)
+    }
+    else if let Ok(c) = do_read_conf("/usr/local/etc/intecture") {
+        Ok(c)
+    } else {
+        do_read_conf("/etc/intecture")
+    }
+}
+
+fn do_read_conf<P: AsRef<Path>>(path: P) -> Result<Config> {
+    let mut path = path.as_ref().to_owned();
+    path.push("auth.json");
+
+    let mut fh = fs::File::open(&path)?;
+    let mut json = String::new();
+    fh.read_to_string(&mut json)?;
+    Ok(serde_json::from_str(&json)?)
+}
+
 #[cfg(test)]
 mod tests {
     use czmq::{ZMsg, ZSock};
     use error::Error;
-    use super::error_handler;
+    use std::{env, fs};
+    use std::io::Write;
+    use super::{error_handler, read_conf};
+    use tempdir::TempDir;
 
     #[test]
     fn test_error_handler() {
@@ -144,5 +214,21 @@ mod tests {
         assert_eq!(msg.popstr().unwrap().unwrap(), "");
         assert_eq!(msg.popstr().unwrap().unwrap(), "Err");
         assert_eq!(msg.popstr().unwrap().unwrap(), "Access to this endpoint is forbidden");
+    }
+
+    #[test]
+    fn test_read_conf() {
+        let tmpdir = TempDir::new("server_test_read_conf").unwrap();
+        let mut path = tmpdir.path().to_owned();
+
+        path.push("auth.json");
+        let mut fh = fs::File::create(&path).unwrap();
+        fh.write_all(b"{\"server_cert\": \"/path\", \"cert_path\": \"/path\", \"api_port\": 123, \"update_port\": 123}").unwrap();
+        path.pop();
+
+        assert!(read_conf(Some(&path)).is_ok());
+        env::set_var("INAUTH_CONFIG_DIR", path.to_str().unwrap());
+        let none: Option<String> = None;
+        assert!(read_conf(none).is_ok());
     }
 }
