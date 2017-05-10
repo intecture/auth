@@ -2,18 +2,23 @@ sudo: required
 dist: trusty
 language: rust
 
+rust:
+  - stable
+  - beta
+  - nightly
+
 addons:
   apt:
+    sources:
+      - sourceline: 'ppa:chris-lea/libsodium'
+      - sourceline: 'deb http://ppa.launchpad.net/chris-lea/libsodium/ubuntu trusty main'
+      - sourceline: 'deb-src http://ppa.launchpad.net/chris-lea/libsodium/ubuntu trusty main'
     packages:
       - libcurl4-openssl-dev
       - libelf-dev
       - libdw-dev
       - binutils-dev
-
-rust:
-  - stable
-  - beta
-  - nightly
+      - libsodium-dev
 
 before_script:
   - |
@@ -24,25 +29,20 @@ before_script:
       export PKG_CONFIG_PATH=$HOME/lib/pkgconfig &&
 
       cd /tmp
-      curl -sSOL https://download.libsodium.org/libsodium/releases/libsodium-1.0.8.tar.gz &&
-      curl -sSOL https://download.libsodium.org/libsodium/releases/libsodium-1.0.8.tar.gz.sig &&
-      curl -sSOL https://download.libsodium.org/jedi.gpg.asc &&
-      gpg --import jedi.gpg.asc &&
-      gpg --verify libsodium-1.0.8.tar.gz.sig libsodium-1.0.8.tar.gz &&
-      tar zxf libsodium-1.0.8.tar.gz &&
-      cd libsodium-1.0.8 &&
-      ./configure --prefix=$HOME && make && make install &&
-      cd .. &&
 
-      curl -sSOL https://github.com/zeromq/zeromq4-1/archive/v4.1.4.tar.gz &&
-      tar zxf v4.1.4.tar.gz &&
-      cd zeromq4-1-4.1.4 &&
-      ./autogen.sh && ./configure --prefix=$HOME --with-libsodium && make && make install &&
-      cd .. &&
+      curl -sSOL https://github.com/zeromq/libzmq/releases/download/v4.2.0/zeromq-4.2.0.tar.gz
+      tar zxf zeromq-4.2.0.tar.gz
+      cd zeromq-4.2.0
+      ./autogen.sh
+      ./configure --prefix=$HOME --with-libsodium
+      make && make install
+      cd ..
 
-      git clone https://github.com/zeromq/czmq &&
-      cd czmq &&
-      ./autogen.sh && ./configure --prefix=$HOME && make && make install &&
+      curl -sSOL https://github.com/zeromq/czmq/releases/download/v4.0.1/czmq-4.0.1.tar.gz
+      tar zxf czmq-4.0.1.tar.gz
+      cd czmq-4.0.1
+      ./configure --prefix=$HOME --silent
+      make && make install
       cd $TRAVIS_BUILD_DIR
 
 script:
