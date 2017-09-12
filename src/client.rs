@@ -7,6 +7,8 @@
 // modified, or distributed except according to those terms.
 
 extern crate czmq;
+#[macro_use]
+extern crate log;
 extern crate serde_json;
 extern crate zdaemon;
 extern crate zmq;

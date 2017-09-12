@@ -66,9 +66,11 @@ impl Endpoint for ZapPublisher {
                 // Only send cache on subscribe ("1"), not unsubscribe ("0")
                 if event == &1 {
                     let cert_type = if topic_bytes.len() == 0 {
+                        debug!("Request to subscribe to all certificates");
                         None
                     } else {
                         let topic = try!(str::from_utf8(&topic_bytes));
+                        debug!("Request to subscribe to {} certificates", topic);
                         Some(try!(CertType::from_str(topic)))
                     };
                     try!(self.cache.borrow().send(&mut self.publisher, cert_type));

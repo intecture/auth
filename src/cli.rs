@@ -8,6 +8,7 @@
 
 extern crate czmq;
 extern crate docopt;
+extern crate log;
 extern crate rustc_serialize;
 extern crate serde;
 #[macro_use]

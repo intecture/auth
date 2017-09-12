@@ -73,7 +73,7 @@ impl ZapHandler {
             worker: Some(spawn(move || {
                 let mut w = Worker::new(zap, subscriber, comm_child, cache);
                 if let Err(_e) = w.run() {
-                    println!("ZAP Error: {:?}", _e);
+                    error!("ZAP Error: {:?}", _e);
                     // XXX impl error_handler()
                 }
             })),
@@ -179,6 +179,8 @@ impl<'a> ZapRequest<'a> {
             return Err(Error::InvalidZapRequest);
         }
 
+        debug!("New ZAP request from {} ({}) via {}", client_pk, address, mechanism);
+
         Ok(ZapRequest {
             cache: cache,
             zap: zap,
@@ -197,6 +199,7 @@ impl<'a> ZapRequest<'a> {
             "CURVE" => {
                 let cert = self.cache.get(&self.client_pk);
                 if let Some(c) = cert {
+                    debug!("Authenticated {}", self.client_pk);
                     try!(self.zap_reply(true, Some(c.encode_meta())));
                     return Ok(());
                 }
@@ -204,6 +207,7 @@ impl<'a> ZapRequest<'a> {
             _ => (),
         }
 
+        debug!("Could not authenticate {}", self.client_pk);
         try!(self.zap_reply(false, None));
         Ok(())
     }

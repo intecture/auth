@@ -73,6 +73,11 @@ impl CertCache {
             if topic.is_none() || cert.cert_type() == topic.unwrap() {
                 try!(msg.addstr(cert.public_txt()));
                 try!(msg.addbytes(&cert.encode_meta()));
+
+                debug!("Sending {}", cert.public_txt());
+                for key in cert.meta_keys() {
+                    debug!("Meta {}: {}", key, cert.meta(key).unwrap().unwrap());
+                }
             }
         }
 
@@ -110,6 +115,11 @@ impl CertCache {
 
                         let zcert = try!(ZCert::from_txt(&pubkey, "0000000000000000000000000000000000000000"));
                         try!(zcert.decode_meta(&meta));
+
+                        debug!("Receiving {}", pubkey);
+                        for key in zcert.meta_keys() {
+                            debug!("Meta {}: {}", key, zcert.meta(key).unwrap().unwrap());
+                        }
 
                         self.cache.insert(zcert.public_txt().to_string(), try!(Cert::from_zcert(zcert)));
                     } else {

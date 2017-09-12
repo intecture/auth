@@ -13,7 +13,6 @@ use std::ops::{Deref, DerefMut};
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum CertType {
     Host,
-    // Runtime,
     User,
 }
 
@@ -22,7 +21,6 @@ impl CertType {
     pub fn from_str(ctype: &str) -> Result<CertType> {
         match ctype {
             "host" => Ok(CertType::Host),
-            // "runtime" => Ok(CertType::Runtime),
             "user" => Ok(CertType::User),
             _ => Err(Error::InvalidCertMeta)
         }
@@ -31,7 +29,6 @@ impl CertType {
     pub fn to_str(&self) -> &'static str {
         match self {
             &CertType::Host => "host",
-            // &CertType::Runtime => "runtime",
             &CertType::User => "user",
         }
     }

@@ -7,6 +7,7 @@
 // modified, or distributed except according to those terms.
 
 use czmq;
+use log;
 use serde_json;
 use std::{convert, error, fmt, io, result};
 use zdaemon;
@@ -28,6 +29,7 @@ pub enum Error {
     InvalidEndpoint,
     InvalidZapRequest,
     Io(io::Error),
+    LogInit(log::SetLoggerError),
     MissingConf,
     PollerTimeout,
     SerdeJson(serde_json::Error),
@@ -51,6 +53,7 @@ impl fmt::Display for Error {
             Error::InvalidEndpoint => write!(f, "Invalid endpoint"),
             Error::InvalidZapRequest => write!(f, "Invalid ZAP request"),
             Error::Io(ref e) => write!(f, "IO error: {}", e),
+            Error::LogInit(ref e) => write!(f, "Log init error: {}", e),
             Error::MissingConf => write!(f, "Cannot open Auth config"),
             Error::PollerTimeout => write!(f, "Timeout while polling sockets"),
             Error::SerdeJson(ref e) => write!(f, "Serde JSON error: {}", e),
@@ -76,6 +79,7 @@ impl error::Error for Error {
             Error::InvalidEndpoint => "Invalid endpoint",
             Error::InvalidZapRequest => "Invalid ZAP request",
             Error::Io(ref e) => e.description(),
+            Error::LogInit(ref e) => e.description(),
             Error::MissingConf => "Cannot open config",
             Error::PollerTimeout => "Timeout while polling sockets",
             Error::SerdeJson(ref e) => e.description(),
@@ -95,6 +99,12 @@ impl convert::From<czmq::Error> for Error {
 impl convert::From<io::Error> for Error {
     fn from(err: io::Error) -> Error {
         Error::Io(err)
+    }
+}
+
+impl convert::From<log::SetLoggerError> for Error {
+    fn from(err: log::SetLoggerError) -> Error {
+        Error::LogInit(err)
     }
 }
 

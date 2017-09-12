@@ -10,7 +10,10 @@ extern crate chan;
 extern crate chan_signal;
 extern crate czmq;
 extern crate docopt;
+extern crate env_logger;
 extern crate inauth_client;
+#[macro_use]
+extern crate log;
 extern crate rustc_serialize;
 extern crate serde;
 #[macro_use]
@@ -92,6 +95,7 @@ fn main() {
 
 fn start<P: AsRef<Path>>(path: Option<P>) -> Result<()> {
     let signal = chan_signal::notify(&[Signal::INT, Signal::TERM]);
+    env_logger::init()?;
     let (parent, child) = ZSys::create_pipe()?;
 
     let config = read_conf(path)?;
