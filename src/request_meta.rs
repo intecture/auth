@@ -11,22 +11,14 @@ use czmq::ZFrame;
 use error::{Error, Result};
 
 pub struct RequestMeta {
-    // id: u32,
     pub name: String,
     pub cert_type: CertType,
+    pub domain: Option<String>,
 }
 
 impl RequestMeta {
     pub fn new(frame: &ZFrame) -> Result<RequestMeta> {
         Ok(RequestMeta {
-            // id: if let Ok(Some(Ok(id))) = frame.meta("id") {
-            //         match id.parse::<u32>() {
-            //             Ok(int) => int,
-            //             Err(_) => return Err(Error::InvalidCert),
-            //         }
-            //     } else {
-            //         return Err(Error::InvalidCert);
-            //     },
             name: if let Some(Ok(name)) = frame.meta("name") {
                     name
                 } else {
@@ -37,6 +29,11 @@ impl RequestMeta {
                 } else {
                     return Err(Error::InvalidCert);
                 },
+            domain: if let Some(Ok(domain)) = frame.meta("domain") {
+                    Some(domain)
+                } else {
+                    None
+                }
         })
     }
 }

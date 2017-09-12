@@ -75,11 +75,11 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
             return Err(Error::Forbidden);
         }
 
-        self.do_create(sock, router_id)
+        self.do_create(sock, router_id, &meta)
     }
 
     // Allow testing without auth
-    fn do_create(&mut self, sock: &mut ZSock, router_id: &[u8]) -> Result<()> {
+    fn do_create(&mut self, sock: &mut ZSock, router_id: &[u8], meta: &RequestMeta) -> Result<()> {
         let request = ZMsg::expect_recv(sock, 2, Some(2), false)?;
 
         let cert_type = match request.popstr().unwrap() {
@@ -93,6 +93,11 @@ impl<P> CertApi<P> where P: PersistenceAdaptor {
         };
 
         let cert = Cert::new(&cert_name, cert_type)?;
+        // If a user belongs to a domain, they can only create new
+        // certificates within that domain.
+        if let Some(ref domain) = meta.domain {
+            cert.set_meta("domain", domain);
+        }
         self.persistence.create(&cert)?;
 
         // Publish cert
@@ -231,7 +236,12 @@ mod tests {
 
         let msg = ZMsg::new();
         msg.send_multi(&mut client, &["host", "usetheforks.com"]).unwrap();
-        api.do_create(&mut server, b"router_id").unwrap();
+        let meta = RequestMeta {
+            name: "test".into(),
+            cert_type: CertType::User,
+            domain: None,
+        };
+        api.do_create(&mut server, b"router_id", &meta).unwrap();
 
         let reply = ZMsg::recv(&mut client).unwrap();
         assert_eq!(reply.size(), 6);
